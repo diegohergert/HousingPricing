@@ -33,11 +33,9 @@ def load_data(file_path):
 
 
 
-def clean_data(input_path, output_cleaned_path, output_covid_path, output_decade_path):
+def clean_data(input, output_cleaned_path, output_covid_path, output_decade_path):
     # Function to clean the data and save to new files
-    df = pd.read_csv(input_path)
-    df.columns = ['price', 'date', 'postcode', 'property_type', 'old/new', 'duration', 'paon',
-                  'saon', 'street', 'locality', 'town_city', 'district', 'county', 'PPD_category', 'DELETEROW']
+    df = input.copy()
     df.drop(columns=['DELETEROW'])
     # Example cleaning steps (to be customized based on actual data)
     df = df.dropna()
@@ -56,11 +54,11 @@ if __name__ == "__main__":
     data_path = "data/pp-complete.csv"
     try:
         print("Starting to load data...")
+        data = load_data(data_path)
+        print(data.head())
         ### cleaning data // reupload into new data file
         print("Starting to clean data...")
-        data_cleaned = "data/pp-complete-cleaned.csv"
-        data_covid = "data/pp-complete-covid.csv"
-        data_decade = "data/pp-complete-decade.csv"
+        clean_data(data, "data/cleaned_data.csv", "data/covid_data.csv", "data/decade_data.csv")
         
         
         ### feature engineering
