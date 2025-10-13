@@ -6,6 +6,31 @@ from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from tqdm import tqdm
+
+def load_data(file_path):
+    columns = ['price', 'date', 'postcode', 'property_type', 'old/new', 'duration', 'paon',
+                    'saon', 'street', 'locality', 'town_city', 'district', 'county', 'PPD_category', 'DELETEROW']
+    try:
+        print("counting total rows...")
+        total_rows = sum(1 for line in open(file_path))  # no headers
+        print(f"Total rows: {total_rows}")
+
+        chunk_size = 100000
+        chunks = []
+        reader = pd.read_csv(file_path, header=None, names=columns, chunksize=chunk_size)
+        for chunk in tqdm(reader, total=-(total_rows//-chunk_size), desc="Loading data"):
+            chunks.append(chunk)
+        df = pd.concat(chunks, ignore_index=True)
+        print("Data loaded successfully.")
+        return df
+    except FileNotFoundError:
+        print(f"Error: The file at {file_path} was not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred while loading the data: {e}")
+        return None
+
 
 
 def clean_data(input_path, output_cleaned_path, output_covid_path, output_decade_path):
@@ -29,26 +54,28 @@ def clean_data(input_path, output_cleaned_path, output_covid_path, output_decade
 
 if __name__ == "__main__":
     data_path = "data/pp-complete.csv"
-    df = pd.read_csv(data_path)
-    df.columns = ['price', 'date', 'postcode', 'property_type', 'old/new', 'duration', 'paon',
-                  'saon', 'street', 'locality', 'town_city', 'district', 'county', 'PPD_category', 'DELETEROW']
-    print(df.head())
-    ### cleaning data // reupload into new data file
-    print("Starting to clean data...")
-    data_cleaned = "data/pp-complete-cleaned.csv"
-    data_covid = "data/pp-complete-covid.csv"
-    data_decade = "data/pp-complete-decade.csv"
-    
-    
-    ### feature engineering
-    print("Starting to load SVM model...")
+    try:
+        print("Starting to load data...")
+        ### cleaning data // reupload into new data file
+        print("Starting to clean data...")
+        data_cleaned = "data/pp-complete-cleaned.csv"
+        data_covid = "data/pp-complete-covid.csv"
+        data_decade = "data/pp-complete-decade.csv"
+        
+        
+        ### feature engineering
+        print("Starting to load SVM model...")
 
-    print("Starting to load XGBoost model...")
+        print("Starting to load XGBoost model...")
 
-    print("Starting to load Random Forest model...")
+        print("Starting to load Random Forest model...")
 
-    print("Starting to load Linear Regression model...")
+        print("Starting to load Linear Regression model...")
 
 
-    ### predictions
-    print("Starting to make predictions...")
+        ### predictions
+        print("Starting to make predictions...")
+    except FileNotFoundError as e:
+        print(f"Error: {e}. Please ensure the data file exists at the specified path.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
