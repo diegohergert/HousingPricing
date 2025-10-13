@@ -13,7 +13,7 @@ def clean_data(input_path, output_cleaned_path, output_covid_path, output_decade
     df = pd.read_csv(input_path)
     df.columns = ['price', 'date', 'postcode', 'property_type', 'old/new', 'duration', 'paon',
                   'saon', 'street', 'locality', 'town_city', 'district', 'county', 'PPD_category', 'DELETEROW']
-    df['DELETEROW'] = df['DELETEROW'].astype(str).str.strip().str.lower() == 'true' ##I STOPED HERE
+    df.drop(columns=['DELETEROW'])
     # Example cleaning steps (to be customized based on actual data)
     df = df.dropna()
     df.to_csv(output_cleaned_path, index=False)
@@ -29,7 +29,10 @@ def clean_data(input_path, output_cleaned_path, output_covid_path, output_decade
 
 if __name__ == "__main__":
     data_path = "data/pp-complete.csv"
-    
+    df = pd.read_csv(data_path)
+    df.columns = ['price', 'date', 'postcode', 'property_type', 'old/new', 'duration', 'paon',
+                  'saon', 'street', 'locality', 'town_city', 'district', 'county', 'PPD_category', 'DELETEROW']
+    print(df.head())
     ### cleaning data // reupload into new data file
     print("Starting to clean data...")
     data_cleaned = "data/pp-complete-cleaned.csv"
