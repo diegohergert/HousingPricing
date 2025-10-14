@@ -69,8 +69,8 @@ def clean_data(df_raw):
     if(df_raw is None):
         print("No data to clean.")
         return
-    #copying data
     print("Starting data cleaning...")
+    #copying data
     df = df_raw.copy()
     df.drop(columns=['record_status','locality','saon','paon'], inplace=True) #maybe paon too idk how that is useful
     print("Dropped unnecessary columns.")
@@ -96,51 +96,65 @@ def clean_data(df_raw):
     print(f"--- Cleaning Complete. Final shape: {df.shape} ---")
     return df
 
-def engineer_features(df):
-    if(df is None):
+def engineer_features(df_raw):
+    if(df_raw is None):
         print("No data to engineer features on.")
         return
     print("Starting feature engineering...")
-    df = df.copy()
-    # Convert 'date' to datetime
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+    df = df_raw.copy()
     
-    # Extract year, month, day of week
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['year'] = df['date'].dt.year
-    df['month'] = df['date'].dt.month
-    df['day_of_week'] = df['date'].dt.dayofweek  # Monday=0, Sunday=6
-    df.drop(columns=['date'], inplace=True)  # Drop date col
+    # boolean encoding
+    simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
+    print("Encoding boolean columns...")
+    df = pd.get_dummies(df, columns=simple_mappings, drop_first=True)
 
-    # boolean #### I STOPPED HERE
-
-    # One-hot encode categorical variables
-    categorical_cols = ['property_type', 'old_new', 'duration', 'ppd_category', 'postcode', 'town_city', 'district', 'county']
-    df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
-
+    # encoding hard mappings
+    hard_mappings = ['postcode', 'street', 'town_city', 'district', 'county']
+    mapping_types = ['mean', 'std', 'count']
+    print("Encoding categorical columns with many unique values...")
+    for col in hard_mappings:
+        for mtype in mapping_types:
+            if mtype == 'count':
+                mapping = df.groupby(col)[col].transform('count')
+            else:
+                mapping = df.groupby(col)['price'].transform(mtype)
+            df[f'{col}_{mtype}'] = mapping
+        df.drop(columns=[col], inplace=True)  # Drop original column after mapping
     print(f"--- Feature Engineering Complete. Final shape: {df.shape} ---")
+    df.fillna(0, inplace=True)  # Fill any NaN that could have been made
     return df
 
-
-def process_data(input, output_cleaned_path, output_covid_path, output_decade_path):
+def process_data(input, output_cleaned_path, output_covid_path, output_decade_path, output_year_path):
     if(input is None):
         print("No data to clean.")
         return
     # Function to clean the data and save to new files
+    print("Starting to process data...")
     df_raw = input.copy()
-    df_cleaned = clean_data(df_raw)
-    df = engineer_features(df_cleaned)
+    df = clean_data(df_raw)
+    
+    # Extract year, month, day of week
+    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M', errors='coerce')
+    df['year'] = df['date'].dt.year
+    df['month'] = df['date'].dt.month
+    df['day_of_week'] = df['date'].dt.dayofweek  # Monday=0, Sunday=6
+    df.drop(columns=['date'], inplace=True)  # Drop date col
+    df.dropna(subset=['year', 'month', 'day_of_week'], inplace=True)  # Drop rows where date conversion failed
+    
     # cleaned full dataset
+    print("Saving cleaned full dataset...")
     df.to_csv(output_cleaned_path, index=False)
 
     # Create a separate after COVID-19 dataset
-    df_covid = df[df['date'] >= '2020-01-01']
+    df_covid = df[df['year'] >= 2020]
     df_covid.to_csv(output_covid_path, index=False)
 
     # Create a separate decade dataset
-    df_decade = df[df['date'] < '2015-01-01']
+    df_decade = df[df['year'] >= 2015]
     df_decade.to_csv(output_decade_path, index=False)
 
+    df_year = df[df['year'] >= 2024]
+    df_year.to_csv(output_year_path, index=False)
 
 if __name__ == "__main__":
     data_path = "data/pp-complete.csv"
@@ -149,18 +163,23 @@ if __name__ == "__main__":
         data = load_data(data_path)
         print(data.head())
         ### cleaning data // reupload into new data file
-        print("Starting to clean data...")
-        process_data(data,"data/pp-cleaned.csv","data/pp-covid.csv","data/pp-decade.csv")
-        
-        ### feature engineering
-        print("Starting to load SVM model...")
+        clean_data_path = "data/pp-cleaned.csv"
+        covid_data_path = "data/pp-covid.csv"
+        decade_data_path = "data/pp-decade.csv"
+        year_data_path = "data/pp-year.csv"
+        #did not feature engineer because of data leaking into test set
+        process_data(data, clean_data_path, covid_data_path, decade_data_path, year_data_path)
+        print("Data processing complete.")
+        ### data splitting 70/15/15
+        print("Starting to split data...")
 
-        print("Starting to load XGBoost model...")
-
-        print("Starting to load Random Forest model...")
-
-        print("Starting to load Linear Regression model...")
-
+        ### model training
+        print("Starting to train SVR model...")
+        print("Starting to train XGBoost model...")
+        print("Starting to train LightGBM model...")
+        print("Starting to train Random Forest model...")
+        print("Starting to train Linear Regression model...")
+        print("Starting to train CatBoost model...")
 
         ### predictions
         print("Starting to make predictions...")
