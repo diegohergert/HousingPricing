@@ -96,7 +96,30 @@ def clean_data(df_raw):
     print(f"--- Cleaning Complete. Final shape: {df.shape} ---")
     return df
 
-def engineer_features(df): ### I STOPPED HERE
+def engineer_features(df):
+    if(df is None):
+        print("No data to engineer features on.")
+        return
+    print("Starting feature engineering...")
+    df = df.copy()
+    # Convert 'date' to datetime
+    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+    
+    # Extract year, month, day of week
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['year'] = df['date'].dt.year
+    df['month'] = df['date'].dt.month
+    df['day_of_week'] = df['date'].dt.dayofweek  # Monday=0, Sunday=6
+    df.drop(columns=['date'], inplace=True)  # Drop date col
+
+    # boolean #### I STOPPED HERE
+
+    # One-hot encode categorical variables
+    categorical_cols = ['property_type', 'old_new', 'duration', 'ppd_category', 'postcode', 'town_city', 'district', 'county']
+    df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+
+    print(f"--- Feature Engineering Complete. Final shape: {df.shape} ---")
+    return df
 
 
 def process_data(input, output_cleaned_path, output_covid_path, output_decade_path):
