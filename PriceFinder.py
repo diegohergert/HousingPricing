@@ -96,33 +96,55 @@ def clean_data(df_raw):
     print(f"--- Cleaning Complete. Final shape: {df.shape} ---")
     return df
 
-def engineer_features(df_raw):
-    if(df_raw is None):
-        print("No data to engineer features on.")
-        return
+def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     print("Starting feature engineering...")
-    df = df_raw.copy()
-    
-    # boolean encoding
-    simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
-    print("Encoding boolean columns...")
-    df = pd.get_dummies(df, columns=simple_mappings, drop_first=True)
 
-    # encoding hard mappings
+    X_train = x_train_raw.copy()
+    print("Learning encodings from training data...")
+
+    simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
     hard_mappings = ['postcode', 'street', 'town_city', 'district', 'county']
-    mapping_types = ['mean', 'std', 'count']
-    print("Encoding categorical columns with many unique values...")
+    mappings = {}
+    mappings['target_encoding'] = {}
+
     for col in hard_mappings:
-        for mtype in mapping_types:
-            if mtype == 'count':
-                mapping = df.groupby(col)[col].transform('count')
-            else:
-                mapping = df.groupby(col)['price'].transform(mtype)
-            df[f'{col}_{mtype}'] = mapping
-        df.drop(columns=[col], inplace=True)  # Drop original column after mapping
-    print(f"--- Feature Engineering Complete. Final shape: {df.shape} ---")
-    df.fillna(0, inplace=True)  # Fill any NaN that could have been made
-    return df
+        print(f"Calculating target encoding for {col}...")
+        mean_map = y_train.groupby(X_train[col]).mean()
+        std_map = y_train.groupby(X_train[col]).std()
+        count_map = X_train[col].value_counts()
+        mappings['target_encoding'][col] = {
+            'mean': mean_map, 'std': std_map, 'count': count_map
+            }
+
+    print("Applying encodings to datasets...")
+
+    datasets = [x_train_raw.copy(), X_val_raw.copy(), X_test_raw.copy()]
+    transformed_dfs = []
+
+    for df in datasets:
+        df = pd.get_dummies(df, columns=simple_mappings, drop_first=True)
+        for col in hard_mappings:
+            maps_for_col = mappings['target_encoding'][col]
+            df[f'{col}_mean'] = df[col].map(maps_for_col['mean'])
+            df[f'{col}_std'] = df[col].map(maps_for_col['std'])
+            df[f'{col}_count'] = df[col].map(maps_for_col['count'])
+        
+        df.drop(columns=hard_mappings, inplace=True)
+        transformed_dfs.append(df)
+
+    X_train, X_val, X_test = transformed_dfs[0], transformed_dfs[1], transformed_dfs[2]
+
+    print("final cleanup for feature engineered data...")
+    train_cols = X_train.columns
+    X_val = X_val.reindex(columns=train_cols, fill_value=0)
+    X_test = X_test.reindex(columns=train_cols, fill_value=0)
+
+    X_train.fillna(0, inplace=True)
+    X_val.fillna(0, inplace=True)
+    X_test.fillna(0, inplace=True)
+
+    print("Feature engineering complete.")
+    return X_train, X_val, X_test
 
 def process_data(input, output_cleaned_path, output_covid_path, output_decade_path, output_year_path):
     if(input is None):
@@ -157,22 +179,22 @@ def process_data(input, output_cleaned_path, output_covid_path, output_decade_pa
     df_year.to_csv(output_year_path, index=False)
 
 if __name__ == "__main__":
-    data_path = "data/pp-complete.csv"
+    #data_path = "data/pp-complete.csv"
     try:
-        print("Starting to load data...")
-        data = load_data(data_path)
-        print(data.head())
+        #print("Starting to load data...")
+        #data = load_data(data_path)
+        #print(data.head())
         ### cleaning data // reupload into new data file
         clean_data_path = "data/pp-cleaned.csv"
         covid_data_path = "data/pp-covid.csv"
         decade_data_path = "data/pp-decade.csv"
         year_data_path = "data/pp-year.csv"
         #did not feature engineer because of data leaking into test set
-        process_data(data, clean_data_path, covid_data_path, decade_data_path, year_data_path)
+        #process_data(data, clean_data_path, covid_data_path, decade_data_path, year_data_path)
         print("Data processing complete.")
         ### data splitting 70/15/15
         print("Starting to split data...")
-
+        clean_df = load_data(clean_data_path)  #need to update load
         ### model training
         print("Starting to train SVR model...")
         print("Starting to train XGBoost model...")
