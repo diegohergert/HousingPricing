@@ -209,6 +209,7 @@ if __name__ == "__main__":
                 continue
             print(f"Processing dataset {name} with shape {df.shape}...")
             X = df.drop(columns=['price'])
+            print(X.head())
             y_actual = df['price']
 
             X_train, X_temp, y_train_orig, y_temp = train_test_split(X, y_actual, test_size=0.3, random_state=1)
@@ -220,8 +221,6 @@ if __name__ == "__main__":
             y_train_log = np.log1p(y_train_orig)  # log1p for numerical stability
             y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
             y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
-
-
 
             ### normalization
             print("Starting normalization...")
