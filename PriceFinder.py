@@ -234,7 +234,11 @@ if __name__ == "__main__":
 
             ### model training
             print("Starting to train SVR model...")
+
             print("Starting to train XGBoost model...")
+            xgb_model = XGBRegressor(objective='reg:squarederror', n_estimators=100, random_state=1)
+            xgb_model.fit(X_train_scaled, y_train_log)
+            print("XGBoost model training complete.")
 
             print("Starting to train LightGBM model...")
             lgb_model = lgb.LGBMRegressor()
@@ -242,6 +246,9 @@ if __name__ == "__main__":
             print("LightGBM model training complete.")
 
             print("Starting to train Random Forest model...")
+            rf_model = RandomForestRegressor(n_estimators=100, random_state=1)
+            rf_model.fit(X_train_scaled, y_train_log)
+            print("Random Forest model training complete.")
 
             print("Starting to train Linear Regression model...")
             lr_model = LinearRegression()
@@ -249,13 +256,33 @@ if __name__ == "__main__":
             print("Linear Regression model training complete.")
 
             print("Starting to train CatBoost model...")
+            cat_model = CatBoostRegressor(verbose=0, random_state=1)
+            cat_model.fit(X_train_scaled, y_train_log)
+            print("CatBoost model training complete.")
 
             ### predictions
             print("Starting to make predictions...")
             y_test = np.expm1(y_test_log)
             y_val = np.expm1(y_val_log)
             print("Starting to make predictions with SVR model...")
+
             print("Starting to make predictions with XGBoost model...")
+            xgb_preds = xgb_model.predict(X_test_scaled)
+            xgb_val_preds = xgb_model.predict(X_val_scaled)
+            xgb_preds = np.expm1(xgb_preds)  # Inverse of log1p
+            xgb_val_preds = np.expm1(xgb_val_preds)  # Inverse of log1p
+            xgb_medae = mean_absolute_error(y_test, xgb_preds)
+            xgb_mse = mean_squared_error(y_test, xgb_preds)
+            xgb_rmse = np.sqrt(xgb_mse)
+            xgb_r2 = r2_score(y_test, xgb_preds)
+            xgb_mape = mean_absolute_percentage_error(y_test, xgb_preds)
+            print(f"XGBoost Test MAE: {xgb_medae:.2f}, MSE: {xgb_mse:.2f}, RMSE: {xgb_rmse:.2f}, R2: {xgb_r2:.4f}, MAPE: {xgb_mape:.4f}")
+            xgb_val_medae = mean_absolute_error(y_val, xgb_val_preds)
+            xgb_val_mse = mean_squared_error(y_val, xgb_val_preds)
+            xgb_val_rmse = np.sqrt(xgb_val_mse)
+            xgb_val_r2 = r2_score(y_val, xgb_val_preds)
+            xgb_val_mape = mean_absolute_percentage_error(y_val, xgb_val_preds)
+            print(f"XGBoost Val MAE: {xgb_val_medae:.2f}, MSE: {xgb_val_mse:.2f}, RMSE: {xgb_val_rmse:.2f}, R2: {xgb_val_r2:.4f}, MAPE: {xgb_val_mape:.4f}")
 
             print("Starting to make predictions with LightGBM model...")
             lgb_preds = lgb_model.predict(X_test_scaled)
@@ -276,6 +303,22 @@ if __name__ == "__main__":
             print(f"LightGBM Val MAE: {lgb_val_medae:.2f}, MSE: {lgb_val_mse:.2f}, RMSE: {lgb_val_rmse:.2f}, R2: {lgb_val_r2:.4f}, MAPE: {lgb_val_mape:.4f}")
 
             print("Starting to make predictions with Random Forest model...")
+            rf_preds = rf_model.predict(X_test_scaled)
+            rf_val_preds = rf_model.predict(X_val_scaled)
+            rf_preds = np.expm1(rf_preds)  # Inverse of log1p
+            rf_val_preds = np.expm1(rf_val_preds)  # Inverse of
+            rf_medae = mean_absolute_error(y_test, rf_preds)
+            rf_mse = mean_squared_error(y_test, rf_preds)
+            rf_rmse = np.sqrt(rf_mse)
+            rf_r2 = r2_score(y_test, rf_preds)
+            rf_mape = mean_absolute_percentage_error(y_test, rf_preds)
+            print(f"Random Forest Test MAE: {rf_medae:.2f}, MSE: {rf_mse:.2f}, RMSE: {rf_rmse:.2f}, R2: {rf_r2:.4f}, MAPE: {rf_mape:.4f}")
+            rf_val_medae = mean_absolute_error(y_val, rf_val_preds)
+            rf_val_mse = mean_squared_error(y_val, rf_val_preds)
+            rf_val_rmse = np.sqrt(rf_val_mse)
+            rf_val_r2 = r2_score(y_val, rf_val_preds)
+            rf_val_mape = mean_absolute_percentage_error(y_val, rf_val_preds)
+            print(f"Random Forest Val MAE: {rf_val_medae:.2f}, MSE: {rf_val_mse:.2f}, RMSE: {rf_val_rmse:.2f}, R2: {rf_val_r2:.4f}, MAPE: {rf_val_mape:.4f}")
 
             print("Starting to make predictions with Linear Regression model...")
             lr_preds = lr_model.predict(X_test_scaled)
@@ -296,6 +339,25 @@ if __name__ == "__main__":
             print(f"Linear Regression Val MAE: {lr_val_medae:.2f}, MSE: {lr_val_mse:.2f}, RMSE: {lr_val_rmse:.2f}, R2: {lr_val_r2:.4f}, MAPE: {lr_val_mape:.4f}")
 
             print("Starting to make predictions with CatBoost model...")
+            cat_preds = cat_model.predict(X_test_scaled)
+            cat_val_preds = cat_model.predict(X_val_scaled)
+            cat_preds = np.expm1(cat_preds)  # Inverse of log1p
+            cat_val_preds = np.expm1(cat_val_preds)  # Inverse of log1p
+            cat_medae = mean_absolute_error(y_test, cat_preds)
+            cat_mse = mean_squared_error(y_test, cat_preds)
+            cat_rmse = np.sqrt(cat_mse)
+            cat_r2 = r2_score(y_test, cat_preds)
+            cat_mape = mean_absolute_percentage_error(y_test, cat_preds)
+            print(f"CatBoost Test MAE: {cat_medae:.2f}, MSE: {cat_mse:.2f}, RMSE: {cat_rmse:.2f}, R2: {cat_r2:.4f}, MAPE: {cat_mape:.4f}")
+            cat_val_medae = mean_absolute_error(y_val, cat_val_preds)
+            cat_val_mse = mean_squared_error(y_val, cat_val_preds)
+            cat_val_rmse = np.sqrt(cat_val_mse)
+            cat_val_r2 = r2_score(y_val, cat_val_preds)
+            cat_val_mape = mean_absolute_percentage_error(y_val, cat_val_preds)
+            print(f"CatBoost Val MAE: {cat_val_medae:.2f}, MSE: {cat_val_mse:.2f}, RMSE: {cat_val_rmse:.2f}, R2: {cat_val_r2:.4f}, MAPE: {cat_val_mape:.4f}")
+
+            print(f"Finished processing dataset {name}.\n")
+            
     except FileNotFoundError as e:
         print(f"Error: {e}. Please ensure the data file exists at the specified path.")
     except Exception as e:
