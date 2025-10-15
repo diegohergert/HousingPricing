@@ -83,12 +83,15 @@ def clean_data(df_raw):
 
 def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     print("Starting feature engineering...")
+    
+    for df in [x_train_raw, X_val_raw, X_test_raw]:
+        df['postcode_area'] = df['postcode'].str.extract(r'(^[A-Z]{1,2})', expand=False)
 
     X_train = x_train_raw.copy()
     print("Learning encodings from training data...")
 
     simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
-    hard_mappings = ['town_city', 'district', 'county']
+    hard_mappings = ['town_city', 'district', 'county', 'postcode_area']
     mappings = {}
     mappings['target_encoding'] = {}
 
@@ -212,7 +215,9 @@ if __name__ == "__main__":
             y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
             y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
 
-            ### noramlization
+
+
+            ### normalization
             print("Starting normalization...")
             scaler = StandardScaler()
             X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
