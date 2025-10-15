@@ -191,14 +191,14 @@ if __name__ == "__main__":
         print("Data processing complete.")
         ### data splitting 70/15/15
         print("Starting to split data...")
-        #clean_df = load_data(clean_data_path)  #later this is huge
+        clean_df = load_data(clean_data_path)  #later this is huge
         covid_df = load_data(covid_data_path)  #2nd smallest
-        #decade_df = load_data(decade_data_path)  #2nd largest
+        decade_df = load_data(decade_data_path)  #2nd largest
         year_df = load_data(year_data_path)  #smallest
 
-        datasets = {#"Clean Dataset": clean_df,
+        datasets = {"Clean Dataset": clean_df,
                     "Covid Dataset": covid_df, 
-                    #"Decade Dataset": decade_df, 
+                    "Decade Dataset": decade_df, 
                     "Year Dataset": year_df}
         
 
@@ -221,6 +221,8 @@ if __name__ == "__main__":
             y_train_log = np.log1p(y_train_orig)  # log1p for numerical stability
             y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
             y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
+
+            print(X_train.head())
 
             ### normalization
             print("Starting normalization...")
