@@ -85,6 +85,12 @@ def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     print("Starting feature engineering...")
     
     for df in [x_train_raw, X_val_raw, X_test_raw]:
+        df['month_sin'] = np.sin(2 * np.pi * df['month']/12)
+        df['month_cos'] = np.cos(2 * np.pi * df['month']/12)
+        
+        # Create cyclical features for day of the week
+        df['day_sin'] = np.sin(2 * np.pi * df['day_of_week']/7)
+        df['day_cos'] = np.cos(2 * np.pi * df['day_of_week']/7)
         df['postcode_area'] = df['postcode'].str.extract(r'(^[A-Z]{1,2})', expand=False)
 
     X_train = x_train_raw.copy()
@@ -175,7 +181,7 @@ if __name__ == "__main__":
         #print("Starting to load data...")
         #data = load_data(data_path)
         #print(data.head())
-        ### cleaning data // reupload into new data file
+        ## cleaning data // reupload into new data file
         clean_data_path = "data/pp-cleaned.csv"
         covid_data_path = "data/pp-covid.csv"
         decade_data_path = "data/pp-decade.csv"
