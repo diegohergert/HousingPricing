@@ -9,29 +9,18 @@ from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
+from sklearn.preprocessing import StandardScaler
+import lightgbm as lgb
+from catboost import CatBoostRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
 
+
+#I CHANGED THIS AFTER CLEANING TO USE 
 def load_data(file_path):
-    columns = [
-        'price',            # The price paid for the property
-        'date',             # Date of the transfer
-        'postcode',         # The postcode of the property
-        'property_type',    # D=Detached, S=Semi-Detached, T=Terraced, F=Flats/Maisonettes, O=Other
-        'old_new',          # Y = a new build, N = an established residential building
-        'duration',         # F = Freehold, L = Leasehold
-        'paon',             # Primary Addressable Object Name (e.g., house number or name)
-        'saon',             # Secondary Addressable Object Name (e.g., flat number)
-        'street',           # Street name
-        'locality',         # e.g., a small village  ## A LOT OF NULLS
-        'town_city',        # The town or city
-        'district',         # The district/local authority area
-        'county',           # The county
-        'ppd_category',     # Price Paid Data Category Type - A = Standard, B = Additional
-        'record_status'     # Record Status - Not useful for this dataset, safe to drop.
-    ]
     try:
         print("Counting total rows...")
         with open(file_path, 'r', encoding='utf-8') as f:
-            total_rows = sum(1 for line in f)
+            total_rows = sum(1 for line in f) -1 #for the header
         print(f"Total rows: {total_rows:,}")
 
         chunk_size = 100000
@@ -42,12 +31,8 @@ def load_data(file_path):
         # and use the robust 'python' engine to handle this correctly.
         reader = pd.read_csv(
             file_path,
-            header=None,
-            names=columns,
             chunksize=chunk_size,
-            engine='python',        # Use the more robust engine
-            quotechar='"',          # Specify that fields are quoted with "
-            quoting=csv.QUOTE_MINIMAL # A standard quoting behavior setting
+            engine='python'      # Use the more robust engine
         )
 
         # total is the total amount of 100k chunks needed to read the whole file
@@ -103,7 +88,7 @@ def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     print("Learning encodings from training data...")
 
     simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
-    hard_mappings = ['postcode', 'street', 'town_city', 'district', 'county']
+    hard_mappings = ['town_city', 'district', 'county']
     mappings = {}
     mappings['target_encoding'] = {}
 
@@ -130,6 +115,9 @@ def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
             df[f'{col}_count'] = df[col].map(maps_for_col['count'])
         
         df.drop(columns=hard_mappings, inplace=True)
+
+        #THESE WERE TOO unique
+        df.drop(columns=['postcode','street'], inplace=True)
         transformed_dfs.append(df)
 
     X_train, X_val, X_test = transformed_dfs[0], transformed_dfs[1], transformed_dfs[2]
@@ -194,17 +182,108 @@ if __name__ == "__main__":
         print("Data processing complete.")
         ### data splitting 70/15/15
         print("Starting to split data...")
-        clean_df = load_data(clean_data_path)  #need to update load
-        ### model training
-        print("Starting to train SVR model...")
-        print("Starting to train XGBoost model...")
-        print("Starting to train LightGBM model...")
-        print("Starting to train Random Forest model...")
-        print("Starting to train Linear Regression model...")
-        print("Starting to train CatBoost model...")
+        #clean_df = load_data(clean_data_path)  #later this is huge
+        covid_df = load_data(covid_data_path)  #2nd smallest
+        #decade_df = load_data(decade_data_path)  #2nd largest
+        year_df = load_data(year_data_path)  #smallest
 
-        ### predictions
-        print("Starting to make predictions...")
+        datasets = {#"Clean Dataset": clean_df,
+                    "Covid Dataset": covid_df, 
+                    #"Decade Dataset": decade_df, 
+                    "Year Dataset": year_df}
+        
+
+        for name, df in datasets.items():
+            #splitting data
+            if df is None:
+                print(f"Dataset {name} is None, skipping...")
+                continue
+            print(f"Processing dataset {name} with shape {df.shape}...")
+            X = df.drop(columns=['price'])
+            y_actual = df['price']
+
+            X_train, X_temp, y_train_orig, y_temp = train_test_split(X, y_actual, test_size=0.3, random_state=1)
+            X_val, X_test, y_val_orig, y_test_orig = train_test_split(X_temp, y_temp, test_size=0.5, random_state=1)
+            print(f"Dataset {name} split into train ({X_train.shape}), val ({X_val.shape}), test ({X_test.shape})")
+
+            ### feature engineering
+            X_train, X_val, X_test = engineer_features(X_train, y_train_orig, X_val, X_test)
+            y_train_log = np.log1p(y_train_orig)  # log1p for numerical stability
+            y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
+            y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
+
+            ### noramlization
+            print("Starting normalization...")
+            scaler = StandardScaler()
+            X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+            X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)
+            X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+            print("Normalization complete.")
+
+            ### model training
+            print("Starting to train SVR model...")
+            print("Starting to train XGBoost model...")
+
+            print("Starting to train LightGBM model...")
+            lgb_model = lgb.LGBMRegressor()
+            lgb_model.fit(X_train_scaled, y_train_log)
+            print("LightGBM model training complete.")
+
+            print("Starting to train Random Forest model...")
+
+            print("Starting to train Linear Regression model...")
+            lr_model = LinearRegression()
+            lr_model.fit(X_train_scaled, y_train_log)
+            print("Linear Regression model training complete.")
+
+            print("Starting to train CatBoost model...")
+
+            ### predictions
+            print("Starting to make predictions...")
+            y_test = np.expm1(y_test_log)
+            y_val = np.expm1(y_val_log)
+            print("Starting to make predictions with SVR model...")
+            print("Starting to make predictions with XGBoost model...")
+
+            print("Starting to make predictions with LightGBM model...")
+            lgb_preds = lgb_model.predict(X_test_scaled)
+            lgb_val_preds = lgb_model.predict(X_val_scaled)
+            lgb_preds = np.expm1(lgb_preds)  # Inverse of log1p
+            lgb_val_preds = np.expm1(lgb_val_preds)  # Inverse of log1p
+            lgb_medae = mean_absolute_error(y_test, lgb_preds)
+            lgb_mse = mean_squared_error(y_test, lgb_preds)
+            lgb_rmse = np.sqrt(lgb_mse)
+            lgb_r2 = r2_score(y_test, lgb_preds)
+            lgb_mape = mean_absolute_percentage_error(y_test, lgb_preds)
+            print(f"LightGBM Test MAE: {lgb_medae:.2f}, MSE: {lgb_mse:.2f}, RMSE: {lgb_rmse:.2f}, R2: {lgb_r2:.4f}, MAPE: {lgb_mape:.4f}")
+            lgb_val_medae = mean_absolute_error(y_val, lgb_val_preds)
+            lgb_val_mse = mean_squared_error(y_val, lgb_val_preds)
+            lgb_val_rmse = np.sqrt(lgb_val_mse)
+            lgb_val_r2 = r2_score(y_val, lgb_val_preds)
+            lgb_val_mape = mean_absolute_percentage_error(y_val, lgb_val_preds)
+            print(f"LightGBM Val MAE: {lgb_val_medae:.2f}, MSE: {lgb_val_mse:.2f}, RMSE: {lgb_val_rmse:.2f}, R2: {lgb_val_r2:.4f}, MAPE: {lgb_val_mape:.4f}")
+
+            print("Starting to make predictions with Random Forest model...")
+
+            print("Starting to make predictions with Linear Regression model...")
+            lr_preds = lr_model.predict(X_test_scaled)
+            lr_val_preds = lr_model.predict(X_val_scaled)
+            lr_preds = np.expm1(lr_preds)  # Inverse of log1p
+            lr_val_preds = np.expm1(lr_val_preds)  # Inverse of log1p
+            lr_medae = mean_absolute_error(y_test, lr_preds)
+            lr_mse = mean_squared_error(y_test, lr_preds)
+            lr_rmse = np.sqrt(lr_mse)
+            lr_r2 = r2_score(y_test, lr_preds)
+            lr_mape = mean_absolute_percentage_error(y_test, lr_preds)
+            print(f"Linear Regression Test MAE: {lr_medae:.2f}, MSE: {lr_mse:.2f}, RMSE: {lr_rmse:.2f}, R2: {lr_r2:.4f}, MAPE: {lr_mape:.4f}")
+            lr_val_medae = mean_absolute_error(y_val, lr_val_preds)
+            lr_val_mse = mean_squared_error(y_val, lr_val_preds)
+            lr_val_rmse = np.sqrt(lr_val_mse)
+            lr_val_r2 = r2_score(y_val, lr_val_preds)
+            lr_val_mape = mean_absolute_percentage_error(y_val, lr_val_preds)
+            print(f"Linear Regression Val MAE: {lr_val_medae:.2f}, MSE: {lr_val_mse:.2f}, RMSE: {lr_val_rmse:.2f}, R2: {lr_val_r2:.4f}, MAPE: {lr_val_mape:.4f}")
+
+            print("Starting to make predictions with CatBoost model...")
     except FileNotFoundError as e:
         print(f"Error: {e}. Please ensure the data file exists at the specified path.")
     except Exception as e:
