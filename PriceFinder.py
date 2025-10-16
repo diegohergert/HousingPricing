@@ -1,19 +1,16 @@
-import csv
-import math
 import pandas as pd
 import numpy as np
-import os
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
+
+#models
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from tqdm import tqdm
-from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 from catboost import CatBoostRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
-
 
 #I CHANGED THIS AFTER CLEANING TO USE 
 def load_data(file_path):
