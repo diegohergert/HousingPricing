@@ -5,6 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import boxcox
+from scipy.special import inv_boxcox
 
 #models
 from sklearn.svm import SVR
@@ -232,7 +234,8 @@ if __name__ == "__main__":
     X_val_scaled = pd.DataFrame(X_val_scaled, columns=X_val.columns)
     X_submission_scaled = pd.DataFrame(X_submission_scaled, columns=X_submission_encoded.columns)
 
-    y_train_log = np.log1p(y_train)
+    y_train_boxcox, lambda_param = boxcox(y_train)
+    print(f"Optimal Box-Cox lambda: {lambda_param:.4f}")
 
     models = {
         "Linear Regression": LinearRegression(),
@@ -286,8 +289,8 @@ if __name__ == "__main__":
     for name, model in models.items():
         print(f"\nTraining and tuning {name}...")
         if name in parameters:
-            random_search = RandomizedSearchCV(model, parameters[name], n_iter=10, scoring='neg_root_mean_squared_error', cv=3, verbose=1, n_jobs=-1, random_state=42)
-            random_search.fit(X_train_scaled, y_train_log)
+            random_search = RandomizedSearchCV(model, parameters[name], n_iter=10, scoring='neg_root_mean_squared_error', cv=3, verbose=1, n_jobs=-1)
+            random_search.fit(X_train_scaled, y_train_boxcox)
 
             best_model_instance = random_search.best_estimator_
             all_best_params[name] = random_search.best_params_
@@ -295,12 +298,12 @@ if __name__ == "__main__":
         
         else:
             best_model_instance = model
-            best_model_instance.fit(X_train_scaled, y_train_log)
+            best_model_instance.fit(X_train_scaled, y_train_boxcox)
             all_best_params[name] = "Default parameters used"
         
         trained_models[name] = best_model_instance
         val_preds_log = best_model_instance.predict(X_val_scaled)
-        val_preds = np.expm1(val_preds_log)
+        val_preds = inv_boxcox(val_preds_log, lambda_param)
         rmse = np.sqrt(mean_squared_error(y_val, val_preds))
         model_performance[name] = rmse
         print(f"{name} Validation RMSE: {rmse:.2f}")
@@ -317,7 +320,7 @@ if __name__ == "__main__":
     print(f"\nBest model: {best_model_name} with RMSE: {best_rmse:.2f}")
 
     final_preds_log = best_model.predict(X_submission_scaled)
-    final_preds = np.expm1(final_preds_log)
+    final_preds = inv_boxcox(final_preds_log, lambda_param)
 
     report_data = []
     for model_name, rmse in sorted_performance:
