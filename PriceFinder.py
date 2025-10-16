@@ -302,6 +302,7 @@ if __name__ == "__main__":
             lgb_val_mape = mean_absolute_percentage_error(y_val, lgb_val_preds)
             print(f"LightGBM Val MAE: {lgb_val_medae:.2f}, MSE: {lgb_val_mse:.2f}, RMSE: {lgb_val_rmse:.2f}, R2: {lgb_val_r2:.4f}, MAPE: {lgb_val_mape:.4f}")
 
+            """"
             print("Starting to make predictions with Random Forest model...")
             rf_preds = rf_model.predict(X_test_scaled)
             rf_val_preds = rf_model.predict(X_val_scaled)
@@ -319,7 +320,8 @@ if __name__ == "__main__":
             rf_val_r2 = r2_score(y_val, rf_val_preds)
             rf_val_mape = mean_absolute_percentage_error(y_val, rf_val_preds)
             print(f"Random Forest Val MAE: {rf_val_medae:.2f}, MSE: {rf_val_mse:.2f}, RMSE: {rf_val_rmse:.2f}, R2: {rf_val_r2:.4f}, MAPE: {rf_val_mape:.4f}")
-
+            """
+            
             print("Starting to make predictions with Linear Regression model...")
             lr_preds = lr_model.predict(X_test_scaled)
             lr_val_preds = lr_model.predict(X_val_scaled)
