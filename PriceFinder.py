@@ -72,36 +72,36 @@ def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     return df_encoded
 
 if __name__ == "__main__":
-    data_path = "dataKaggle/train.csv"
-    try:
-        data = load_data(data_path)
-        print(data.head())
-        ### data splitting 70/15/15
-        print("Starting to split data...")
-        
+    train_data_path = "dataKaggle/train.csv"
+    test_data_path = "dataKaggle/test.csv"
 
+    try:
+        data = load_data(train_data_path)
+        test_data = load_data(test_data_path)
+        if data is None or test_data is None:
+            print("Data loading failed. Exiting.")
+            exit(1)
+        print(data.head())
         datasets = {"full": clean_data(data)}
         
 
         for name, df in datasets.items():
-            #splitting data
             if df is None:
                 print(f"Dataset {name} is None, skipping...")
                 continue
             print(f"Processing dataset {name} with shape {df.shape}...")
-            X = df.drop(columns=['SalePrice', 'Id'])  # drop 'Id' if present
-            print(X.head())
-            y_actual = df['SalePrice']
+            X_train, y_train = df.drop(columns=['SalePrice']), df['SalePrice']
+            X_temp, y_temp = test_data.drop(columns=['SalePrice']), test_data['SalePrice']
+            # splitting test into test and val
+            X_test, X_val, y_test, y_val = train_test_split(X_temp, y_temp, test_size=0.5, random_state=1)
 
-            X_train, X_temp, y_train_orig, y_temp = train_test_split(X, y_actual, test_size=0.3, random_state=1)
-            X_val, X_test, y_val_orig, y_test_orig = train_test_split(X_temp, y_temp, test_size=0.5, random_state=1)
             print(f"Dataset {name} split into train ({X_train.shape}), val ({X_val.shape}), test ({X_test.shape})")
 
             ### feature engineering (until fixed)
             #X_train, X_val, X_test = engineer_features(X_train, y_train_orig, X_val, X_test)
-            y_train_log = np.log1p(y_train_orig)  # log1p for numerical stability
-            y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
-            y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
+            y_train_log = np.log1p(y_train)  # log1p for numerical stability
+            y_val_log = np.log1p(y_val)  # log1p for numerical stability
+            y_test_log = np.log1p(y_test)  # log1p for numerical stability
 
             print(X_train.head())
 
