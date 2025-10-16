@@ -168,7 +168,7 @@ def plot_actual_predicted_best(y_true, y_pred, model_name):
     plt.savefig(f'actual_vs_predicted_{model_name}.png')
     plt.show()  
 
-def plot_top_models_predictions(top_models_list, all_trained_models, X_val_data, y_val_data):
+def plot_top_models_predictions(top_models_list, all_trained_models, X_val_data, y_val_data, lambda_param):
     plt.figure(figsize=(12, 12))
 
     colors = plt.cm.viridis(np.linspace(0, 1, len(top_models_list)))
@@ -178,9 +178,9 @@ def plot_top_models_predictions(top_models_list, all_trained_models, X_val_data,
         model = all_trained_models[model_name]
         
         # Make predictions
-        preds_log = model.predict(X_val_data)
-        preds = np.expm1(preds_log)
-        
+        preds_boxcox = model.predict(X_val_data)
+        preds = inv_boxcox(preds_boxcox, lambda_param)
+
         # Plot the predictions for this model
         plt.scatter(y_val_data, preds, alpha=0.5, color=colors[i], 
                     label=f'{model_name} (RMSE: ${rmse:,.2f})')
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     for name, model in models.items():
         print(f"\nTraining and tuning {name}...")
         if name in parameters:
-            random_search = RandomizedSearchCV(model, parameters[name], n_iter=10, scoring='neg_root_mean_squared_error', cv=3, verbose=1, n_jobs=-1)
+            random_search = RandomizedSearchCV(model, parameters[name], n_iter=30, scoring='neg_root_mean_squared_error', cv=3, verbose=1, n_jobs=-1)
             random_search.fit(X_train_scaled, y_train_boxcox)
 
             best_model_instance = random_search.best_estimator_
@@ -343,8 +343,8 @@ if __name__ == "__main__":
     plot_results(model_performance)
     sorted_performance_models = sorted(model_performance.items(), key=lambda item: item[1])
     top_5_models = sorted_performance_models[:5]
-    plot_top_models_predictions(top_5_models, trained_models, X_val_scaled, y_val)
+    plot_top_models_predictions(top_5_models, trained_models, X_val_scaled, y_val, lambda_param)
 
-    final_val_preds_log = best_model.predict(X_val_scaled)
-    final_val_preds = np.expm1(final_val_preds_log)
+    final_val_preds_boxcox = best_model.predict(X_val_scaled)
+    final_val_preds = inv_boxcox(final_val_preds_boxcox, lambda_param)
     plot_actual_predicted_best(y_val, final_val_preds, best_model_name)
