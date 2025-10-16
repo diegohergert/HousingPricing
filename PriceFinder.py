@@ -228,14 +228,18 @@ if __name__ == "__main__":
     X_val_scaled = scaler.transform(X_val)
     X_submission_scaled = scaler.transform(X_submission_encoded)
 
+    X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
+    X_val_scaled = pd.DataFrame(X_val_scaled, columns=X_val.columns)
+    X_submission_scaled = pd.DataFrame(X_submission_scaled, columns=X_submission_encoded.columns)
+
     y_train_log = np.log1p(y_train)
 
     models = {
         "Linear Regression": LinearRegression(),
         "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
         "XGBoost": XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42),
-        "LightGBM": lgb.LGBMRegressor(n_estimators=100, learning_rate=0.1, random_state=42),
-        "CatBoost": CatBoostRegressor(iterations=100, learning_rate=0.1, random_seed=42, verbose=0),
+        "LightGBM": lgb.LGBMRegressor(n_estimators=100, learning_rate=0.1, random_state=42, verbose=-1),
+        "CatBoost": CatBoostRegressor(iterations=100, learning_rate=0.1, random_seed=42, verbose=0, allow_writing_files=False),
         "SVR": SVR(kernel='rbf', C=100, gamma=0.1, epsilon=.1)
     }
 
@@ -314,6 +318,18 @@ if __name__ == "__main__":
 
     final_preds_log = best_model.predict(X_submission_scaled)
     final_preds = np.expm1(final_preds_log)
+
+    report_data = []
+    for model_name, rmse in sorted_performance:
+        params = all_best_params.get(model_name, "default")
+        report_data.append({
+            'Model': model_name,
+            'RMSE': f'{rmse:.2f}',
+            'Best Parameters': str(params)
+        })
+    report_df = pd.DataFrame(report_data)
+    report_file = 'model_report.csv'
+    report_df.to_csv(report_file, index=False)
 
     submission_df = pd.DataFrame({
         'Id': submission_ids,
