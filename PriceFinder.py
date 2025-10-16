@@ -15,28 +15,8 @@ from catboost import CatBoostRegressor
 #I CHANGED THIS AFTER CLEANING TO USE 
 def load_data(file_path):
     try:
-        print("Counting total rows...")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            total_rows = sum(1 for line in f) -1 #for the header
-        print(f"Total rows: {total_rows:,}")
-
-        chunk_size = 100000
-        chunks = []
-
-        # --- THE FIX IS HERE ---
-        # We tell pandas that fields are enclosed in double quotes (")
-        # and use the robust 'python' engine to handle this correctly.
-        reader = pd.read_csv(
-            file_path,
-            chunksize=chunk_size,
-            engine='python'      # Use the more robust engine
-        )
-
-        # total is the total amount of 100k chunks needed to read the whole file
-        for chunk in tqdm(reader, total=math.ceil(total_rows/chunk_size), desc="Loading data"):
-            chunks.append(chunk)
-            
-        df = pd.concat(chunks, ignore_index=True)
+        print(f"Loading data from {file_path}...")
+        df = pd.read_csv(file_path)
         print("\nData loaded successfully.")
         return df
         
@@ -54,8 +34,6 @@ def clean_data(df_raw):
     print("Starting data cleaning...")
     #copying data
     df = df_raw.copy()
-    df.drop(columns=['record_status','locality','saon','paon'], inplace=True) #maybe paon too idk how that is useful
-    print("Dropped unnecessary columns.")
     
     print("Checking for null values...")
     null_counts = df.isnull().sum()
@@ -81,122 +59,28 @@ def clean_data(df_raw):
 def engineer_features(x_train_raw, y_train, X_val_raw, X_test_raw):
     print("Starting feature engineering...")
     
-    for df in [x_train_raw, X_val_raw, X_test_raw]:
-        df['month_sin'] = np.sin(2 * np.pi * df['month']/12)
-        df['month_cos'] = np.cos(2 * np.pi * df['month']/12)
-        
-        # Create cyclical features for day of the week
-        df['day_sin'] = np.sin(2 * np.pi * df['day_of_week']/7)
-        df['day_cos'] = np.cos(2 * np.pi * df['day_of_week']/7)
-        df['postcode_area'] = df['postcode'].str.extract(r'(^[A-Z]{1,2})', expand=False)
+    df['MSSubClass'] = df['MSSubClass'].apply(str)
+    df['OverallCond'] = df['OverallCond'].astype(str)
+    df['YrSold'] = df['YrSold'].astype(str)
+    df['MoSold'] = df['MoSold'].astype(str)
 
-    X_train = x_train_raw.copy()
-    print("Learning encodings from training data...")
-
-    simple_mappings = ['property_type', 'old_new', 'duration', 'ppd_category']
-    hard_mappings = ['town_city', 'district', 'county', 'postcode_area']
-    mappings = {}
-    mappings['target_encoding'] = {}
-
-    for col in hard_mappings:
-        print(f"Calculating target encoding for {col}...")
-        mean_map = y_train.groupby(X_train[col]).mean()
-        std_map = y_train.groupby(X_train[col]).std()
-        count_map = X_train[col].value_counts()
-        mappings['target_encoding'][col] = {
-            'mean': mean_map, 'std': std_map, 'count': count_map
-            }
-
-    print("Applying encodings to datasets...")
-
-    datasets = [x_train_raw.copy(), X_val_raw.copy(), X_test_raw.copy()]
-    transformed_dfs = []
-
-    for df in datasets:
-        df = pd.get_dummies(df, columns=simple_mappings, drop_first=True)
-        for col in hard_mappings:
-            maps_for_col = mappings['target_encoding'][col]
-            df[f'{col}_mean'] = df[col].map(maps_for_col['mean'])
-            df[f'{col}_std'] = df[col].map(maps_for_col['std'])
-            df[f'{col}_count'] = df[col].map(maps_for_col['count'])
-        
-        df.drop(columns=hard_mappings, inplace=True)
-
-        #THESE WERE TOO unique
-        df.drop(columns=['postcode','street'], inplace=True)
-        transformed_dfs.append(df)
-
-    X_train, X_val, X_test = transformed_dfs[0], transformed_dfs[1], transformed_dfs[2]
-
-    print("final cleanup for feature engineered data...")
-    train_cols = X_train.columns
-    X_val = X_val.reindex(columns=train_cols, fill_value=0)
-    X_test = X_test.reindex(columns=train_cols, fill_value=0)
-
-    X_train.fillna(0, inplace=True)
-    X_val.fillna(0, inplace=True)
-    X_test.fillna(0, inplace=True)
-
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    print(f"One-hot encoding {len(categorical_cols)} categorical columns...")
+    df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+    
     print("Feature engineering complete.")
-    return X_train, X_val, X_test
-
-def process_data(input, output_cleaned_path, output_covid_path, output_decade_path, output_year_path):
-    if(input is None):
-        print("No data to clean.")
-        return
-    # Function to clean the data and save to new files
-    print("Starting to process data...")
-    df_raw = input.copy()
-    df = clean_data(df_raw)
-    
-    # Extract year, month, day of week
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M', errors='coerce')
-    df['year'] = df['date'].dt.year
-    df['month'] = df['date'].dt.month
-    df['day_of_week'] = df['date'].dt.dayofweek  # Monday=0, Sunday=6
-    df.drop(columns=['date'], inplace=True)  # Drop date col
-    df.dropna(subset=['year', 'month', 'day_of_week'], inplace=True)  # Drop rows where date conversion failed
-    
-    # cleaned full dataset
-    print("Saving cleaned full dataset...")
-    df.to_csv(output_cleaned_path, index=False)
-
-    # Create a separate after COVID-19 dataset
-    df_covid = df[df['year'] >= 2020]
-    df_covid.to_csv(output_covid_path, index=False)
-
-    # Create a separate decade dataset
-    df_decade = df[df['year'] >= 2015]
-    df_decade.to_csv(output_decade_path, index=False)
-
-    df_year = df[df['year'] >= 2024]
-    df_year.to_csv(output_year_path, index=False)
+    return df_encoded
 
 if __name__ == "__main__":
-    #data_path = "data/pp-complete.csv"
+    data_path = "dataKaggle/train.csv"
     try:
-        #print("Starting to load data...")
-        #data = load_data(data_path)
-        #print(data.head())
-        ## cleaning data // reupload into new data file
-        clean_data_path = "data/pp-cleaned.csv"
-        covid_data_path = "data/pp-covid.csv"
-        decade_data_path = "data/pp-decade.csv"
-        year_data_path = "data/pp-year.csv"
-        #did not feature engineer because of data leaking into test set
-        #process_data(data, clean_data_path, covid_data_path, decade_data_path, year_data_path)
-        print("Data processing complete.")
+        data = load_data(data_path)
+        print(data.head())
         ### data splitting 70/15/15
         print("Starting to split data...")
-        #clean_df = load_data(clean_data_path)  #later this is huge
-        covid_df = load_data(covid_data_path)  #2nd smallest
-        #decade_df = load_data(decade_data_path)  #2nd largest
-        year_df = load_data(year_data_path)  #smallest
+        
 
-        datasets = {#"Clean Dataset": clean_df,
-                    "Covid Dataset": covid_df, 
-                    #"Decade Dataset": decade_df, 
-                    "Year Dataset": year_df}
+        datasets = {"full": clean_data(data)}
         
 
         for name, df in datasets.items():
@@ -205,16 +89,16 @@ if __name__ == "__main__":
                 print(f"Dataset {name} is None, skipping...")
                 continue
             print(f"Processing dataset {name} with shape {df.shape}...")
-            X = df.drop(columns=['price'])
+            X = df.drop(columns=['SalePrice', 'Id'])  # drop 'Id' if present
             print(X.head())
-            y_actual = df['price']
+            y_actual = df['SalePrice']
 
             X_train, X_temp, y_train_orig, y_temp = train_test_split(X, y_actual, test_size=0.3, random_state=1)
             X_val, X_test, y_val_orig, y_test_orig = train_test_split(X_temp, y_temp, test_size=0.5, random_state=1)
             print(f"Dataset {name} split into train ({X_train.shape}), val ({X_val.shape}), test ({X_test.shape})")
 
-            ### feature engineering
-            X_train, X_val, X_test = engineer_features(X_train, y_train_orig, X_val, X_test)
+            ### feature engineering (until fixed)
+            #X_train, X_val, X_test = engineer_features(X_train, y_train_orig, X_val, X_test)
             y_train_log = np.log1p(y_train_orig)  # log1p for numerical stability
             y_val_log = np.log1p(y_val_orig)  # log1p for numerical stability
             y_test_log = np.log1p(y_test_orig)  # log1p for numerical stability
