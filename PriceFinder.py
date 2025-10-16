@@ -82,7 +82,7 @@ if __name__ == "__main__":
             print("Data loading failed. Exiting.")
             exit(1)
         print(data.head())
-        datasets = {"full": clean_data(data)}
+        datasets = {"full": clean_data(data)} #might do more splits
         
 
         for name, df in datasets.items():
@@ -90,19 +90,27 @@ if __name__ == "__main__":
                 print(f"Dataset {name} is None, skipping...")
                 continue
             print(f"Processing dataset {name} with shape {df.shape}...")
-            X_train, y_train = df.drop(columns=['SalePrice']), df['SalePrice']
-            X_temp, y_temp = test_data.drop(columns=['SalePrice']), test_data['SalePrice']
-            # splitting test into test and val
-            X_test, X_val, y_test, y_val = train_test_split(X_temp, y_temp, test_size=0.5, random_state=1)
+            
+            # Separate features and target
+            X = df.drop(columns=['Id', 'SalePrice'])
+            y = df['SalePrice']
+            
+            X_submission = test_data.copy()
+            X_submission_ids = X_submission['Id']
 
-            print(f"Dataset {name} split into train ({X_train.shape}), val ({X_val.shape}), test ({X_test.shape})")
+            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=1)
+
+            print(f"Dataset {name} split into train ({X_train.shape}), val ({X_val.shape}), submission ({X_submission.shape})")
+
+            
+
+
 
             ### feature engineering (until fixed)
             #X_train, X_val, X_test = engineer_features(X_train, y_train_orig, X_val, X_test)
             y_train_log = np.log1p(y_train)  # log1p for numerical stability
             y_val_log = np.log1p(y_val)  # log1p for numerical stability
-            y_test_log = np.log1p(y_test)  # log1p for numerical stability
-
+        
             print(X_train.head())
 
             ### normalization
@@ -110,7 +118,7 @@ if __name__ == "__main__":
             scaler = StandardScaler()
             X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
             X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns)
-            X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+            #X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
             print("Normalization complete.")
 
             ### model training
@@ -145,21 +153,14 @@ if __name__ == "__main__":
 
             ### predictions
             print("Starting to make predictions...")
-            y_test = np.expm1(y_test_log)
             y_val = np.expm1(y_val_log)
             print("Starting to make predictions with SVR model...")
 
             print("Starting to make predictions with XGBoost model...")
-            xgb_preds = xgb_model.predict(X_test_scaled)
             xgb_val_preds = xgb_model.predict(X_val_scaled)
             xgb_preds = np.expm1(xgb_preds)  # Inverse of log1p
             xgb_val_preds = np.expm1(xgb_val_preds)  # Inverse of log1p
-            xgb_medae = mean_absolute_error(y_test, xgb_preds)
-            xgb_mse = mean_squared_error(y_test, xgb_preds)
-            xgb_rmse = np.sqrt(xgb_mse)
-            xgb_r2 = r2_score(y_test, xgb_preds)
-            xgb_mape = mean_absolute_percentage_error(y_test, xgb_preds)
-            print(f"XGBoost Test MAE: {xgb_medae:.2f}, MSE: {xgb_mse:.2f}, RMSE: {xgb_rmse:.2f}, R2: {xgb_r2:.4f}, MAPE: {xgb_mape:.4f}")
+
             xgb_val_medae = mean_absolute_error(y_val, xgb_val_preds)
             xgb_val_mse = mean_squared_error(y_val, xgb_val_preds)
             xgb_val_rmse = np.sqrt(xgb_val_mse)
@@ -168,16 +169,10 @@ if __name__ == "__main__":
             print(f"XGBoost Val MAE: {xgb_val_medae:.2f}, MSE: {xgb_val_mse:.2f}, RMSE: {xgb_val_rmse:.2f}, R2: {xgb_val_r2:.4f}, MAPE: {xgb_val_mape:.4f}")
 
             print("Starting to make predictions with LightGBM model...")
-            lgb_preds = lgb_model.predict(X_test_scaled)
             lgb_val_preds = lgb_model.predict(X_val_scaled)
             lgb_preds = np.expm1(lgb_preds)  # Inverse of log1p
             lgb_val_preds = np.expm1(lgb_val_preds)  # Inverse of log1p
-            lgb_medae = mean_absolute_error(y_test, lgb_preds)
-            lgb_mse = mean_squared_error(y_test, lgb_preds)
-            lgb_rmse = np.sqrt(lgb_mse)
-            lgb_r2 = r2_score(y_test, lgb_preds)
-            lgb_mape = mean_absolute_percentage_error(y_test, lgb_preds)
-            print(f"LightGBM Test MAE: {lgb_medae:.2f}, MSE: {lgb_mse:.2f}, RMSE: {lgb_rmse:.2f}, R2: {lgb_r2:.4f}, MAPE: {lgb_mape:.4f}")
+
             lgb_val_medae = mean_absolute_error(y_val, lgb_val_preds)
             lgb_val_mse = mean_squared_error(y_val, lgb_val_preds)
             lgb_val_rmse = np.sqrt(lgb_val_mse)
@@ -206,16 +201,10 @@ if __name__ == "__main__":
             """
             
             print("Starting to make predictions with Linear Regression model...")
-            lr_preds = lr_model.predict(X_test_scaled)
             lr_val_preds = lr_model.predict(X_val_scaled)
             lr_preds = np.expm1(lr_preds)  # Inverse of log1p
             lr_val_preds = np.expm1(lr_val_preds)  # Inverse of log1p
-            lr_medae = mean_absolute_error(y_test, lr_preds)
-            lr_mse = mean_squared_error(y_test, lr_preds)
-            lr_rmse = np.sqrt(lr_mse)
-            lr_r2 = r2_score(y_test, lr_preds)
-            lr_mape = mean_absolute_percentage_error(y_test, lr_preds)
-            print(f"Linear Regression Test MAE: {lr_medae:.2f}, MSE: {lr_mse:.2f}, RMSE: {lr_rmse:.2f}, R2: {lr_r2:.4f}, MAPE: {lr_mape:.4f}")
+
             lr_val_medae = mean_absolute_error(y_val, lr_val_preds)
             lr_val_mse = mean_squared_error(y_val, lr_val_preds)
             lr_val_rmse = np.sqrt(lr_val_mse)
@@ -224,16 +213,10 @@ if __name__ == "__main__":
             print(f"Linear Regression Val MAE: {lr_val_medae:.2f}, MSE: {lr_val_mse:.2f}, RMSE: {lr_val_rmse:.2f}, R2: {lr_val_r2:.4f}, MAPE: {lr_val_mape:.4f}")
 
             print("Starting to make predictions with CatBoost model...")
-            cat_preds = cat_model.predict(X_test_scaled)
             cat_val_preds = cat_model.predict(X_val_scaled)
             cat_preds = np.expm1(cat_preds)  # Inverse of log1p
             cat_val_preds = np.expm1(cat_val_preds)  # Inverse of log1p
-            cat_medae = mean_absolute_error(y_test, cat_preds)
-            cat_mse = mean_squared_error(y_test, cat_preds)
-            cat_rmse = np.sqrt(cat_mse)
-            cat_r2 = r2_score(y_test, cat_preds)
-            cat_mape = mean_absolute_percentage_error(y_test, cat_preds)
-            print(f"CatBoost Test MAE: {cat_medae:.2f}, MSE: {cat_mse:.2f}, RMSE: {cat_rmse:.2f}, R2: {cat_r2:.4f}, MAPE: {cat_mape:.4f}")
+            
             cat_val_medae = mean_absolute_error(y_val, cat_val_preds)
             cat_val_mse = mean_squared_error(y_val, cat_val_preds)
             cat_val_rmse = np.sqrt(cat_val_mse)
