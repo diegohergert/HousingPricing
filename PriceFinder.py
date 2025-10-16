@@ -245,11 +245,13 @@ if __name__ == "__main__":
             lgb_model.fit(X_train_scaled, y_train_log)
             print("LightGBM model training complete.")
 
+            """
             print("Starting to train Random Forest model...")
             rf_model = RandomForestRegressor(n_estimators=100, random_state=1)
             rf_model.fit(X_train_scaled, y_train_log)
             print("Random Forest model training complete.")
-
+            """
+            
             print("Starting to train Linear Regression model...")
             lr_model = LinearRegression()
             lr_model.fit(X_train_scaled, y_train_log)
