@@ -111,6 +111,14 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
         axes[i].set_visible(False)
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.subplots_adjust(
+    left=0.069,
+    bottom=0.07,
+    right=0.975,
+    top=0.922,
+    wspace=0.26,
+    hspace=0.507
+    )
     plt.savefig('numerical_features_vs_saleprice.png')
     plt.show()
 
@@ -127,12 +135,20 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
             # Order by median SalePrice for a cleaner look
             order = data.groupby(col)['SalePrice'].median().sort_values().index
             sns.boxplot(data=data, x=col, y='SalePrice', ax=axes_cat[i], order=order)
-            axes_cat[i].tick_params(axis='x', rotation=45, ha='right')
+            axes_cat[i].tick_params(axis='x', rotation=45)
         
         for i in range(len(categorical_features_to_plot), len(axes_cat)):
             axes_cat[i].set_visible(False)
         
         plt.tight_layout(rect=[0, 0, 1, 0.97])
+        plt.subplots_adjust(
+        left=0.069,
+        bottom=0.07,
+        right=0.975,
+        top=0.922,
+        wspace=0.26,
+        hspace=0.507
+        )
         plt.savefig('categorical_features_vs_saleprice.png')
         plt.show()
 
