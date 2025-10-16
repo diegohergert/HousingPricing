@@ -97,20 +97,20 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
     # Create the subplot grid
     n_cols = 3
     n_rows = int(np.ceil(len(top_numerical_features) / n_cols))
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 6, n_rows * 5))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4))
     axes = axes.flatten() # Flatten the grid to easily loop through it
 
-    fig.suptitle('Top Correlated Numerical Features vs. SalePrice', fontsize=20, y=1.02)
+    fig.suptitle('Top Correlated Numerical Features vs. SalePrice', fontsize=18, y=1.03)
 
     for i, col in enumerate(top_numerical_features):
-        sns.scatterplot(data=data, x=col, y='SalePrice', ax=axes[i], alpha=0.6)
-        axes[i].set_title(f'SalePrice vs. {col}\nCorr: {correlations[col]:.2f}', fontsize=12)
+        sns.scatterplot(data=data, x=col, y='SalePrice', ax=axes[i], alpha=0.5)
+        axes[i].set_title(f'{col} (Corr: {correlations[col]:.2f})', fontsize=12, pad=10)
 
     # Hide any unused subplots
     for i in range(len(top_numerical_features), len(axes)):
         axes[i].set_visible(False)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.98])
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig('numerical_features_vs_saleprice.png')
     plt.show()
 
@@ -121,18 +121,18 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
         fig_cat, axes_cat = plt.subplots(n_rows_cat, n_cols_cat, figsize=(n_cols_cat * 6, n_rows_cat * 5))
         axes_cat = axes_cat.flatten()
 
-        fig_cat.suptitle('Key Categorical Features vs. SalePrice', fontsize=20, y=1.02)
+        fig_cat.suptitle('Key Categorical Features vs. SalePrice', fontsize=18, y=1.03)
         
         for i, col in enumerate(categorical_features_to_plot):
             # Order by median SalePrice for a cleaner look
             order = data.groupby(col)['SalePrice'].median().sort_values().index
             sns.boxplot(data=data, x=col, y='SalePrice', ax=axes_cat[i], order=order)
-            axes_cat[i].tick_params(axis='x', rotation=45)
+            axes_cat[i].tick_params(axis='x', rotation=45, ha='right')
         
         for i in range(len(categorical_features_to_plot), len(axes_cat)):
             axes_cat[i].set_visible(False)
         
-        plt.tight_layout(rect=[0, 0, 1, 0.98])
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
         plt.savefig('categorical_features_vs_saleprice.png')
         plt.show()
 
