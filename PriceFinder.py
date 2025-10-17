@@ -337,15 +337,15 @@ if __name__ == "__main__":
     final_preds = inv_boxcox(final_preds_log, lambda_param)
 
     report_data = []
-    for model_name, rmse in sorted_performance:
+    for model_name, metrics in sorted_performance:
         params = all_best_params.get(model_name, "default")
         report_data.append({
             'Model': model_name,
-            'RMSE': f'{rmse:.2f}',
-            'MAE': f'{performance['MAE']:.2f}',
-            'MSE': f'{performance['MSE']:.2f}',
-            'MAPE': f'{performance['MAPE']:.2f}',
-            'R2': f'{performance['R2']:.2f}',
+            'RMSE': f'{metrics['RMSE']:.2f}',
+            'MAE': f'{metrics['MAE']:.2f}',
+            'MSE': f'{metrics['MSE']:.2f}',
+            'MAPE': f'{metrics['MAPE']:.2f}',
+            'R2': f'{metrics['R2']:.2f}',
             'Best Parameters': str(params)
         })
     report_df = pd.DataFrame(report_data)
@@ -358,10 +358,11 @@ if __name__ == "__main__":
     })
     submission_df.to_csv('submission.csv', index=False)
 
-    plot_results(model_performance)
-    sorted_performance_models = sorted(model_performance.items(), key=lambda item: item[1])
-    top_5_models = sorted_performance_models[:5]
-    plot_top_models_predictions(top_5_models, trained_models, X_val_scaled, y_val, lambda_param)
+    rmse_plot = {name: metrics['RMSE'] for name, metrics in model_performance.items()}
+    plot_results(rmse_plot)
+    top_5_models = sorted_performance[:5]
+    top_5_plot = [(name, metrics['RMSE']) for name, metrics in top_5_models]
+    plot_top_models_predictions(top_5_plot, trained_models, X_val_scaled, y_val, lambda_param)
 
     final_val_preds_boxcox = best_model.predict(X_val_scaled)
     final_val_preds = inv_boxcox(final_val_preds_boxcox, lambda_param)
