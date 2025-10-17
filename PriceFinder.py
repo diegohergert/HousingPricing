@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import boxcox
 from scipy.special import inv_boxcox
+from sklearn.base import clone
 
 #models
 from sklearn.svm import SVR
@@ -466,7 +467,7 @@ if __name__ == "__main__":
     y_full_boxcox, lambda_param_full = boxcox(y_full)
     
     print(f"\nRetraining best model {best_model_name} on full dataset...")
-    model = models[best_model_name]
+    model = clone(models[best_model_name])
     best_params = all_best_params.get(best_model_name)
     if best_params != "Default parameters used":
         model.set_params(**best_params)
@@ -487,7 +488,7 @@ if __name__ == "__main__":
     top_3_model_names = [model[0] for model in sorted_performance[:3]] 
     for model_name in top_3_model_names:
         print(f"Retraining {model_name} for the ensemble...")
-        model_instance = models[model_name]
+        model_instance = clone(models[model_name])
         params = all_best_params.get(model_name)
         if params != "Default parameters used":
             model_instance.set_params(**params)
