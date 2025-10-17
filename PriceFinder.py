@@ -301,7 +301,7 @@ if __name__ == "__main__":
     new_features = ['BsmtQual_Vol', 'TotalBaths', 'TotalPorchSF']
     plot_Engineered_Features(X_encoded, y, new_features)
 
-    X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.2)
     print(f"Training set shape: {X_train.shape}, Validation set shape: {X_val.shape}")
 
     X_submission_encoded = X_submission_encoded.reindex(columns=X_train.columns, fill_value=0)
@@ -426,18 +426,13 @@ if __name__ == "__main__":
             'MAE': f"{metrics['MAE']:.2f}",
             'MSE': f"{metrics['MSE']:.2f}",
             'MAPE': f"{metrics['MAPE']:.2f}",
-            'R2': f"{metrics['R2']:.2f}",
+            'R2': f"{metrics['R2']:.4f}",
             'Best Parameters': str(params)
         })
     report_df = pd.DataFrame(report_data)
-    report_file = 'model_report.csv'
+    report_file = 'model_report(val).csv'
     report_df.to_csv(report_file, index=False)
 
-    submission_df = pd.DataFrame({
-        'Id': submission_ids,
-        'SalePrice': final_preds
-    })
-    submission_df.to_csv('submission.csv', index=False)
 
     rmse_plot = {name: metrics['RMSE'] for name, metrics in model_performance.items()}
     plot_results(rmse_plot)
@@ -448,3 +443,29 @@ if __name__ == "__main__":
     final_val_preds_boxcox = best_model.predict(X_val_scaled)
     final_val_preds = inv_boxcox(final_val_preds_boxcox, lambda_param)
     plot_actual_predicted_best(y_val, final_val_preds, best_model_name)
+
+
+
+    ## combining train and validation for best model retraining
+    X_full = pd.concat([X_train, X_val], axis=0)
+    y_full = pd.concat([y_train, y_val], axis=0)
+    X_full_scaled = scaler.fit_transform(X_full)
+    X_full_scaled = pd.DataFrame(X_full_scaled, columns=X_full.columns)
+    y_full_boxcox, lambda_param_full = boxcox(y_full)
+    
+    print(f"\nRetraining best model {best_model_name} on full dataset...")
+    model = models[best_model_name]
+    best_params = all_best_params.get(best_model_name)
+    if best_params != "Default parameters used":
+        model.set_params(**best_params)
+    model.fit(X_full_scaled, y_full_boxcox)
+    final_test_preds_boxcox = model.predict(X_submission_scaled)
+    final_test_preds = inv_boxcox(final_test_preds_boxcox, lambda_param_full)
+
+    submission_df = pd.DataFrame({
+        'Id': submission_ids,
+        'SalePrice': final_test_preds
+    })
+    submission_file = 'submission.csv'
+    submission_df.to_csv(submission_file, index=False)
+    print(f"Submission file '{submission_file}' created successfully.")
