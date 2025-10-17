@@ -37,7 +37,7 @@ def engineer_features(train_df, test_df):
     combined_df = pd.concat([train_df, test_df], axis=0, ignore_index=True)
     print(f"Combined dataset shape: {combined_df.shape}")
     
-    #fill nans with median
+    #fill nans with median  #try with zero next 
     num_cols = combined_df.select_dtypes(include=np.number).isnull().sum()
     num_cols = num_cols[num_cols > 0].index
     for col in num_cols:
@@ -87,10 +87,11 @@ def engineer_features(train_df, test_df):
         'BsmtFinSF1', 'BsmtFinSF2', 'BsmtFullBath', 'BsmtHalfBath', 'BsmtExposure',
         'FullBath', 'HalfBath', 'OpenPorchSF', 'EnclosedPorch', '3SsnPorch', 'ScreenPorch'
     ]
-    cols_to_drop.extend([col + '_mapped' for col in quality_cols])
-    cols_to_drop.extend([col + '_mapped' for col in BsmtFinType_cols])
-    cols_to_drop.extend(['BsmtExposure_mapped'])
-    combined_df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+    #seeing no drop
+    #cols_to_drop.extend([col + '_mapped' for col in quality_cols])
+    #cols_to_drop.extend([col + '_mapped' for col in BsmtFinType_cols])
+    #cols_to_drop.extend(['BsmtExposure_mapped'])
+    #combined_df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
     print("Manual feature engineering complete.")
 
     # use mode to fill remaining categorical nans
