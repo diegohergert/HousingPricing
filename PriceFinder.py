@@ -44,24 +44,71 @@ def engineer_features(train_df, test_df):
         median_value = train_df[col].median()  #NOT FULL BC DATA LEAKAGE
         combined_df[col] = combined_df[col].fillna(median_value)
     print(f"Imputed {len(num_cols)} numerical columns with their median.")
-    
-    #fill nans with mode
-    cat_cols = combined_df.select_dtypes(include='object').isnull().sum()
-    cat_cols = cat_cols[cat_cols > 0].index
-    for col in cat_cols:
-        mode_value = train_df[col].mode()[0] #NOT FULL BC DATA LEAKAGE
-        combined_df[col] = combined_df[col].fillna(mode_value)
-    print(f"Imputed {len(cat_cols)} categorical columns with their mode.")
 
-    combined_df['MSSubClass'] = combined_df['MSSubClass'].astype(str)
-    combined_df['OverallCond'] = combined_df['OverallCond'].astype(str)
-    combined_df['YrSold'] = combined_df['YrSold'].astype(str)
-    combined_df['MoSold'] = combined_df['MoSold'].astype(str)
+    print("Starting manual feature engineering...")
+    #simple mappings
+    quality_map = {'Po': 1, 'Fa': 2, 'TA': 3, 'Gd': 4, 'Ex': 5}
+    BsmtFinType_map = {'Unf': 1, 'LwQ': 2, 'Rec': 3, 'BLQ': 4, 'ALQ': 5, 'GLQ': 6}
+    quality_cols = [
+        'ExterQual', 'ExterCond', 'BsmtQual', 'BsmtCond', 'HeatingQC', 
+        'KitchenQual', 'FireplaceQu', 'GarageQual', 'GarageCond'
+    ]
+    for col in quality_cols:
+        combined_df[col + '_mapped'] = combined_df[col].map(quality_map).fillna(0)
+
+    # A list of the basement finish type columns
+    BsmtFinType_cols = ['BsmtFinType1', 'BsmtFinType2']
+    for col in BsmtFinType_cols:
+        combined_df[col + '_mapped'] = combined_df[col].map(BsmtFinType_map).fillna(0)
+
+    # Create the Basement Quality-Volume feature
+    BsmtExposure_map = {'No': 1, 'Mn': 2, 'Av': 3, 'Gd': 4}
+    combined_df['BsmtExposure_mapped'] = combined_df['BsmtExposure'].map(BsmtExposure_map).fillna(0)
+    combined_df['BsmtQual_Vol'] = (
+        (combined_df['BsmtFinType1_mapped'] * combined_df['BsmtFinSF1'] * combined_df['BsmtQual_mapped'] +
+        combined_df['BsmtFinType2_mapped'] * combined_df['BsmtFinSF2'] * combined_df['BsmtQual_mapped']) *
+        (1 + combined_df['BsmtExposure_mapped'])
+    )
+
+    # Create total bathrooms feature
+    combined_df['TotalBaths'] = (
+        combined_df['FullBath'] + 0.5 * combined_df['HalfBath'] +
+        combined_df['BsmtFullBath'] + 0.5 * combined_df['BsmtHalfBath']
+    )
+
+    # Create total porch square footage feature
+    porch_cols = ['OpenPorchSF', 'EnclosedPorch', '3SsnPorch', 'ScreenPorch']
+    combined_df['TotalPorchSF'] = combined_df[porch_cols].sum(axis=1)
+
+    # delete used columns
+    cols_to_drop = [
+        'ExterQual', 'ExterCond', 'BsmtQual', 'BsmtCond', 'HeatingQC', 'KitchenQual',
+        'FireplaceQu', 'GarageQual', 'GarageCond', 'BsmtFinType1', 'BsmtFinType2', 
+        'BsmtFinSF1', 'BsmtFinSF2', 'BsmtFullBath', 'BsmtHalfBath', 'BsmtExposure',
+        'FullBath', 'HalfBath', 'OpenPorchSF', 'EnclosedPorch', '3SsnPorch', 'ScreenPorch'
+    ]
+    cols_to_drop.extend([col + '_mapped' for col in quality_cols])
+    cols_to_drop.extend([col + '_mapped' for col in BsmtFinType_cols])
+    cols_to_drop.extend(['BsmtExposure_mapped'])
+    combined_df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+    print("Manual feature engineering complete.")
+
+    # use mode to fill remaining categorical nans
+    cat_cols_with_nan = combined_df.select_dtypes(include='object').isnull().sum()
+    cat_cols_to_impute = cat_cols_with_nan[cat_cols_with_nan > 0].index
+    for col in cat_cols_to_impute:
+        mode_value = train_df[col].mode()[0]
+        combined_df[col] = combined_df[col].fillna(mode_value)
+    print(f"Imputed {len(cat_cols_to_impute)} categorical columns with their mode.")
     
-    #encode categorical variables
+    # Convert numerical identifiers to strings before one-hot encoding
+    for col in ['MSSubClass', 'OverallCond', 'YrSold', 'MoSold']:
+         combined_df[col] = combined_df[col].astype(str)
+
+    # Now, create dummy variables for the remaining object columns
     df_encoded = pd.get_dummies(combined_df, columns=combined_df.select_dtypes(include='object').columns, drop_first=True)
 
-    #split back
+    # Split back into training and test sets
     train_df_encoded = df_encoded.iloc[:train_len]
     test_df_encoded = df_encoded.iloc[train_len:]
 
@@ -154,6 +201,36 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
         plt.savefig('categorical_features_vs_saleprice.png')
         plt.show()
 
+def plot_Engineered_Features(engineered_df, target, features_to_plot):
+    plot_df = pd.concat([engineered_df[features_to_plot], target], axis=1)
+    n_cols = 3
+    n_rows = int(np.ceil(len(features_to_plot) / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4))
+    axes = axes.flatten()
+
+    fig.suptitle('Engineered Features vs. SalePrice', fontsize=18, y=1.03)
+
+    for i, col in enumerate(features_to_plot):
+        sns.scatterplot(data=plot_df, x=col, y='SalePrice', ax=axes[i], alpha=0.5)
+        axes[i].set_title(f'{col} (Corr: {plot_df[col].corr(plot_df["SalePrice"]):.2f})', fontsize=12, pad=10)
+        axes[i].set_xlabel(col)
+        axes[i].set_ylabel('SalePrice')
+
+    for i in range(len(features_to_plot), len(axes)):
+        axes[i].set_visible(False)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.subplots_adjust(
+    left=0.069,
+    bottom=0.07,
+    right=0.975,
+    top=0.922,
+    wspace=0.26,
+    hspace=0.507
+    )
+    plt.savefig('engineered_features_vs_saleprice.png')
+    plt.show()
+
 def plot_actual_predicted_best(y_true, y_pred, model_name):
     plt.figure(figsize=(12, 12))
     plt.scatter(y_true, y_pred, alpha=0.5, color='green')
@@ -219,6 +296,9 @@ if __name__ == "__main__":
     X_submission = test_data.drop(columns=['Id'])
 
     X_encoded, X_submission_encoded = engineer_features(X, X_submission)
+
+    new_features = ['BsmtQual_Vol', 'TotalBaths', 'TotalPorchSF']
+    plot_Engineered_Features(X_encoded, y, new_features)
 
     X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.2, random_state=42)
     print(f"Training set shape: {X_train.shape}, Validation set shape: {X_val.shape}")
