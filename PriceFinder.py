@@ -41,8 +41,8 @@ def engineer_features(train_df, test_df):
     num_cols = combined_df.select_dtypes(include=np.number).isnull().sum()
     num_cols = num_cols[num_cols > 0].index
     for col in num_cols:
-        median_value = train_df[col].median()  #NOT FULL BC DATA LEAKAGE
-        combined_df[col] = combined_df[col].fillna(median_value)
+        #median_value = train_df[col].median()  #NOT FULL BC DATA LEAKAGE
+        combined_df[col] = combined_df[col].fillna(0)
     print(f"Imputed {len(num_cols)} numerical columns with their median.")
 
     print("Starting manual feature engineering...")
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     new_features = ['BsmtQual_Vol', 'TotalBaths', 'TotalPorchSF']
     plot_Engineered_Features(X_encoded, y, new_features)
 
-    X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.2)
+    X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.15)
     print(f"Training set shape: {X_train.shape}, Validation set shape: {X_val.shape}")
 
     X_submission_encoded = X_submission_encoded.reindex(columns=X_train.columns, fill_value=0)
@@ -430,9 +430,23 @@ if __name__ == "__main__":
             'Best Parameters': str(params)
         })
     report_df = pd.DataFrame(report_data)
-    report_file = 'model_report(val).csv'
+    report_file = 'model_report.csv'
     report_df.to_csv(report_file, index=False)
 
+    print("Creating an ensemble of the top 3 models..." )
+    top_3_models = [model[0] for model in sorted_performance[:3]]
+    ensemble_preds = np.zeros(X_submission_scaled.shape[0])
+    val_preds_ensemble = {}
+    for model_name in top_3_models:
+        model_instance = trained_models[model_name]
+        preds = model_instance.predict(X_val_scaled)
+        val_preds_ensemble[model_name] = inv_boxcox(preds, lambda_param)
+    predictions_df = pd.DataFrame(val_preds_ensemble, index=y_val.index)
+    ensemble_preds = predictions_df.mean(axis=1)
+    ensemble_RMSE = np.sqrt(mean_squared_error(y_val, ensemble_preds.loc[y_val.index]))
+    ensemble_r2 = r2_score(y_val, ensemble_preds.loc[y_val.index])
+    print(f"Ensemble Model RMSE on Validation Set: {ensemble_RMSE:.2f}, R2: {ensemble_r2:.4f}")
+    plot_actual_predicted_best(y_val, ensemble_preds, "Ensemble Model")
 
     rmse_plot = {name: metrics['RMSE'] for name, metrics in model_performance.items()}
     plot_results(rmse_plot)
@@ -443,8 +457,6 @@ if __name__ == "__main__":
     final_val_preds_boxcox = best_model.predict(X_val_scaled)
     final_val_preds = inv_boxcox(final_val_preds_boxcox, lambda_param)
     plot_actual_predicted_best(y_val, final_val_preds, best_model_name)
-
-
 
     ## combining train and validation for best model retraining
     X_full = pd.concat([X_train, X_val], axis=0)
@@ -466,6 +478,25 @@ if __name__ == "__main__":
         'Id': submission_ids,
         'SalePrice': final_test_preds
     })
-    submission_file = 'submission.csv'
+    submission_file = 'submission(single).csv'
     submission_df.to_csv(submission_file, index=False)
     print(f"Submission file '{submission_file}' created successfully.")
+
+    print("\nRetraining top models for an ensemble submission...")
+    final_predictions = {}
+    top_3_model_names = [model[0] for model in sorted_performance[:3]] 
+    for model_name in top_3_model_names:
+        print(f"Retraining {model_name} for the ensemble...")
+        model_instance = models[model_name]
+        params = all_best_params.get(model_name)
+        if params != "Default parameters used":
+            model_instance.set_params(**params)
+        model_instance.fit(X_full_scaled, y_full_boxcox)
+        preds_transformed = model_instance.predict(X_submission_scaled)
+        final_predictions[model_name] = inv_boxcox(preds_transformed, lambda_param)
+
+    predictions_df = pd.DataFrame(final_predictions)
+    ensemble_preds = predictions_df.mean(axis=1)
+    ensemble_submission_df = pd.DataFrame({'Id': submission_ids, 'SalePrice': ensemble_preds})
+    ensemble_submission_df.to_csv('final_ensemble_submission.csv', index=False)
+    print("Final ensemble submission file created successfully!")

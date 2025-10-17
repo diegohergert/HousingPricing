@@ -1,7 +1,7 @@
 Model,RMSE,MAE,MSE,MAPE,R2,Best Parameters
-XGBoost,24039.47,14639.19,577896193.32,0.09,0.92,"{'subsample': 0.6, 'n_estimators': 1000, 'max_depth': 3, 'learning_rate': 0.03, 'colsample_bytree': 0.3}"
-Linear Regression,25215.81,15408.53,635837200.21,0.09,0.92,Default parameters used
-CatBoost,27432.01,15377.71,752515100.25,0.09,0.90,"{'learning_rate': 0.1, 'l2_leaf_reg': 1, 'iterations': 700, 'depth': 5}"
-LightGBM,29032.64,16693.15,842894098.57,0.10,0.89,"{'num_leaves': 25, 'n_estimators': 600, 'learning_rate': 0.03, 'boosting_type': 'gbdt'}"
-Random Forest,29533.86,17281.49,872249135.04,0.10,0.89,"{'n_estimators': 700, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_depth': None}"
-SVR,43825.79,21926.59,1920699586.30,0.14,0.75,"{'kernel': 'rbf', 'gamma': 'auto', 'epsilon': 0.02, 'C': 8}"
+CatBoost,18252.30,13029.89,333146344.64,0.08,0.9352,"{'learning_rate': 0.05, 'l2_leaf_reg': 1, 'iterations': 700, 'depth': 5}"
+Linear Regression,18447.37,13818.63,340305290.20,0.09,0.9338,Default parameters used
+LightGBM,18685.10,13359.34,349132874.01,0.08,0.9321,"{'num_leaves': 15, 'n_estimators': 600, 'learning_rate': 0.03, 'boosting_type': 'gbdt'}"
+XGBoost,19090.16,12896.19,364434160.24,0.08,0.9291,"{'subsample': 0.6, 'n_estimators': 1000, 'max_depth': 3, 'learning_rate': 0.04, 'colsample_bytree': 0.3}"
+Random Forest,23883.34,15735.23,570413748.42,0.09,0.8891,"{'n_estimators': 500, 'min_samples_split': 5, 'min_samples_leaf': 2, 'max_depth': None}"
+SVR,28442.02,18469.78,808948641.18,0.12,0.8427,"{'kernel': 'rbf', 'gamma': 'auto', 'epsilon': 0.02, 'C': 8}"
