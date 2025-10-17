@@ -42,7 +42,7 @@ def engineer_features(train_df, test_df):
     num_cols = num_cols[num_cols > 0].index
     for col in num_cols:
         median_value = train_df[col].median()  #NOT FULL BC DATA LEAKAGE
-        combined_df[col].fillna(median_value, inplace=True)
+        combined_df[col] = combined_df[col].fillna(median_value)
     print(f"Imputed {len(num_cols)} numerical columns with their median.")
     
     #fill nans with mode
@@ -50,7 +50,7 @@ def engineer_features(train_df, test_df):
     cat_cols = cat_cols[cat_cols > 0].index
     for col in cat_cols:
         mode_value = train_df[col].mode()[0] #NOT FULL BC DATA LEAKAGE
-        combined_df[col].fillna(mode_value, inplace=True)
+        combined_df[col] = combined_df[col].fillna(mode_value)
     print(f"Imputed {len(cat_cols)} categorical columns with their mode.")
 
     combined_df['MSSubClass'] = combined_df['MSSubClass'].astype(str)
@@ -247,36 +247,37 @@ if __name__ == "__main__":
     }
 
     parameters = {
-        "Random Forest": {
-            'n_estimators': [100, 200],
-            'max_depth': [None, 10, 20],
-            'min_samples_split': [2, 5],
-            'min_samples_leaf': [1, 2, 4]
-        },
-        "XGBoost": {
-            'n_estimators': [100, 200],
-            'learning_rate': [0.01, 0.05, 0.1],
-            'max_depth': [3, 6, 8],
-            'subsample': [0.6, 0.9],
-            'colsample_bytree': [0.6, 0.9]
-        },
-        "LightGBM": {
-            'n_estimators': [100, 200, 400],
-            'learning_rate': [0.01, 0.05, 0.1],
-            'num_leaves': [20, 30, 55],
-            'boosting_type': ['gbdt', 'dart']
-        },
-        "CatBoost": {
-            'iterations': [100, 200, 400],
-            'learning_rate': [0.01, 0.05, 0.1],
-            'depth': [4, 6, 10],
-            'l2_leaf_reg': [3, 5, 7]
-        },
-        "SVR": {
-            'C': [0.1, 1, 10, 100],
-            'gamma': ['scale', 'auto', 0.01, 0.1],
-            'epsilon': [0.05, 0.1, 0.2]
-        }
+    "Random Forest": {
+        'n_estimators': [400, 500, 700],
+        'max_depth': [2, 10, None],
+        'min_samples_split': [2, 3, 5],
+        'min_samples_leaf': [2, 3, 5] 
+    },
+    "XGBoost": {
+        'n_estimators': [400, 600, 800, 1000],
+        'learning_rate': [0.01, 0.03, 0.04],
+        'max_depth': [2, 3, 4], 
+        'subsample': [0.5, 0.6, 0.7], 
+        'colsample_bytree': [0.3, 0.5, 0.6] 
+    },
+    "LightGBM": {
+        'n_estimators': [600, 800, 1000],
+        'learning_rate': [0.03, 0.05, 0.07],
+        'num_leaves': [15, 20, 25], 
+        'boosting_type': ['gbdt'] 
+    },
+    "CatBoost": {
+        'iterations': [500, 600, 700],
+        'learning_rate': [0.05, .08, 0.1], 
+        'depth': [4, 5, 7, 10], 
+        'l2_leaf_reg': [0.3, 0.6, 1, 2] 
+    },
+    "SVR": {
+        'kernel': ['rbf', 'poly'],
+        'C': [8, 10, 12],
+        'gamma': ['auto'],
+        'epsilon': [0.02, 0.03, 0.05] 
+    }
     }
 
     best_rmse = float('inf')  #using rmse to evaluate
@@ -304,8 +305,21 @@ if __name__ == "__main__":
         trained_models[name] = best_model_instance
         val_preds_log = best_model_instance.predict(X_val_scaled)
         val_preds = inv_boxcox(val_preds_log, lambda_param)
-        rmse = np.sqrt(mean_squared_error(y_val, val_preds))
-        model_performance[name] = rmse
+        
+        mse = mean_squared_error(y_val, val_preds)
+        rmse = np.sqrt(mse)
+        mae = mean_absolute_error(y_val, val_preds)
+        r2 = r2_score(y_val, val_preds)
+        mape = mean_absolute_percentage_error(y_val, val_preds)
+
+        model_performance[name] = {
+            'RMSE': rmse,
+            'MAE': mae,
+            'MSE': mse,
+            'MAPE': mape,
+            'R2': r2
+        }
+
         print(f"{name} Validation RMSE: {rmse:.2f}")
 
         if rmse < best_rmse:
@@ -313,10 +327,10 @@ if __name__ == "__main__":
             best_model_name = name
             best_model = best_model_instance
         
-    sorted_performance = sorted(model_performance.items(), key=lambda item: item[1])
+    sorted_performance = sorted(model_performance.items(), key=lambda item: item[1]['RMSE'])
     for model_name, performance in sorted_performance:
-        print(f"{model_name}: RMSE = {performance:.2f}")
-    
+        print(f"{model_name}: RMSE = {performance['RMSE']:.2f}")
+
     print(f"\nBest model: {best_model_name} with RMSE: {best_rmse:.2f}")
 
     final_preds_log = best_model.predict(X_submission_scaled)
@@ -328,6 +342,10 @@ if __name__ == "__main__":
         report_data.append({
             'Model': model_name,
             'RMSE': f'{rmse:.2f}',
+            'MAE': f'{performance['MAE']:.2f}',
+            'MSE': f'{performance['MSE']:.2f}',
+            'MAPE': f'{performance['MAPE']:.2f}',
+            'R2': f'{performance['R2']:.2f}',
             'Best Parameters': str(params)
         })
     report_df = pd.DataFrame(report_data)
