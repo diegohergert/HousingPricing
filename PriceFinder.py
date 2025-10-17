@@ -341,11 +341,11 @@ if __name__ == "__main__":
         params = all_best_params.get(model_name, "default")
         report_data.append({
             'Model': model_name,
-            'RMSE': f'{metrics['RMSE']:.2f}',
-            'MAE': f'{metrics['MAE']:.2f}',
-            'MSE': f'{metrics['MSE']:.2f}',
-            'MAPE': f'{metrics['MAPE']:.2f}',
-            'R2': f'{metrics['R2']:.2f}',
+            'RMSE': f"{metrics['RMSE']:.2f}",
+            'MAE': f"{metrics['MAE']:.2f}",
+            'MSE': f"{metrics['MSE']:.2f}",
+            'MAPE': f"{metrics['MAPE']:.2f}",
+            'R2': f"{metrics['R2']:.2f}",
             'Best Parameters': str(params)
         })
     report_df = pd.DataFrame(report_data)
