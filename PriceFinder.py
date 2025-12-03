@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import KFold, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
 import matplotlib.pyplot as plt
@@ -173,7 +173,7 @@ def plot_EDA(data, top_n_numerical, categorical_features_to_plot):
     plt.savefig('numerical_features_vs_saleprice.png')
     plt.show()
 
-    # --- Part 2: Key Categorical Features vs. SalePrice ---
+    # Key Categorical Features vs. SalePrice 
     if categorical_features_to_plot:
         n_cols_cat = 3
         n_rows_cat = int(np.ceil(len(categorical_features_to_plot) / n_cols_cat))
@@ -290,7 +290,7 @@ if __name__ == "__main__":
         'OverallQual', 'Neighborhood', 'BldgType', 
         'ExterQual', 'KitchenQual', 'GarageType'
     ]
-    plot_EDA(train_data, top_n_numerical=9, categorical_features_to_plot=key_categorical_features)
+    # plot_EDA(train_data, top_n_numerical=9, categorical_features_to_plot=key_categorical_features)
 
     X = train_data.drop(columns=['Id','SalePrice'])
     y = train_data['SalePrice']
@@ -300,204 +300,207 @@ if __name__ == "__main__":
     X_encoded, X_submission_encoded = engineer_features(X, X_submission)
 
     new_features = ['BsmtQual_Vol', 'TotalBaths', 'TotalPorchSF']
-    plot_Engineered_Features(X_encoded, y, new_features)
+    # plot_Engineered_Features(X_encoded, y, new_features)
 
-    X_train, X_val, y_train, y_val = train_test_split(X_encoded, y, test_size=0.15)
-    print(f"Training set shape: {X_train.shape}, Validation set shape: {X_val.shape}")
+    # ensure columns align
+    X_submission_encoded = X_submission_encoded.reindex(columns=X_encoded.columns, fill_value=0)
 
-    X_submission_encoded = X_submission_encoded.reindex(columns=X_train.columns, fill_value=0)
-
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_val_scaled = scaler.transform(X_val)
-    X_submission_scaled = scaler.transform(X_submission_encoded)
-
-    X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
-    X_val_scaled = pd.DataFrame(X_val_scaled, columns=X_val.columns)
-    X_submission_scaled = pd.DataFrame(X_submission_scaled, columns=X_submission_encoded.columns)
-
-    y_train_boxcox, lambda_param = boxcox(y_train)
-    print(f"Optimal Box-Cox lambda: {lambda_param:.4f}")
+    # 5 Fold CV setup
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
     models = {
         "Linear Regression": LinearRegression(),
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
-        "XGBoost": XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42),
-        "LightGBM": lgb.LGBMRegressor(n_estimators=100, learning_rate=0.1, random_state=42, verbose=-1),
-        "CatBoost": CatBoostRegressor(iterations=100, learning_rate=0.1, random_seed=42, verbose=0, allow_writing_files=False),
+        "Random Forest": RandomForestRegressor(n_estimators=100),
+        "XGBoost": XGBRegressor(n_estimators=100, learning_rate=0.1),
+        "LightGBM": lgb.LGBMRegressor(n_estimators=100, learning_rate=0.1, verbose=-1),
+        "CatBoost": CatBoostRegressor(iterations=100, learning_rate=0.1, verbose=0, allow_writing_files=False),
         "SVR": SVR(kernel='rbf', C=100, gamma=0.1, epsilon=.1)
     }
 
     parameters = {
     "Random Forest": {
         'n_estimators': [400, 500, 700],
-        'max_depth': [2, 10, None],
-        'min_samples_split': [2, 3, 5],
-        'min_samples_leaf': [2, 3, 5] 
+        'max_depth': [20, 10, None],
+        'min_samples_split': [2, 5],
+        'min_samples_leaf': [2, 1] 
     },
     "XGBoost": {
-        'n_estimators': [400, 600, 800, 1000],
-        'learning_rate': [0.01, 0.03, 0.04],
-        'max_depth': [2, 3, 4], 
-        'subsample': [0.5, 0.6, 0.7], 
-        'colsample_bytree': [0.3, 0.5, 0.6] 
+        'n_estimators': [2000, 1000],
+        'learning_rate': [0.01, 0.03, 0.008],
+        'max_depth': [6, 3, 4], 
+        'subsample': [0.6, 0.7], 
+        'colsample_bytree': [0.4, 0.5] 
     },
     "LightGBM": {
-        'n_estimators': [600, 800, 1000],
-        'learning_rate': [0.03, 0.05, 0.07],
-        'num_leaves': [15, 20, 25], 
+        'n_estimators': [2000, 1000],
+        'learning_rate': [0.03, 0.05, 0.01],
+        'num_leaves': [15, 60, 25], 
         'boosting_type': ['gbdt'] 
     },
     "CatBoost": {
-        'iterations': [500, 600, 700],
-        'learning_rate': [0.05, .08, 0.1], 
-        'depth': [4, 5, 7, 10], 
-        'l2_leaf_reg': [0.3, 0.6, 1, 2] 
+        'iterations': [1500, 700],
+        'learning_rate': [.02, 0.1], 
+        'depth': [4, 5, 6], 
+        'l2_leaf_reg': [3, 1, 2] 
     },
     "SVR": {
         'kernel': ['rbf', 'poly'],
-        'C': [8, 10, 12],
+        'C': [8, 20],
         'gamma': ['auto'],
-        'epsilon': [0.02, 0.03, 0.05] 
+        'epsilon': [0.02, 0.01] 
     }
     }
 
     best_rmse = float('inf')  #using rmse to evaluate
     best_model_name = None
-    best_model = None
-    all_best_params = {}
+    best_model_params = None
+    
     model_performance = {}
-    trained_models = {}
+    oof_predictions = {} # Store Out-Of-Fold predictions for ensemble
+
+    print(f"\nStarting 5-Fold Cross-Validation...")
 
     for name, model in models.items():
-        print(f"\nTraining and tuning {name}...")
-        if name in parameters:
-            random_search = RandomizedSearchCV(model, parameters[name], n_iter=30, scoring='neg_root_mean_squared_error', cv=3, verbose=1, n_jobs=-1)
-            random_search.fit(X_train_scaled, y_train_boxcox)
+        print(f"\nProcessing {name}...")
+        
+        # --- Tune params first using RandomizedSearchCV on the whole set ---
+        # (This uses internal CV, so it's safe-ish, but we re-eval with manual CV below)
+        
+        # Temp scaling for tuning
+        scaler_temp = StandardScaler()
+        X_scaled_temp = pd.DataFrame(scaler_temp.fit_transform(X_encoded), columns=X_encoded.columns)
+        y_bc_temp, _ = boxcox(y)
+        
+        tuned_model = model
+        current_best_params = "Default parameters used"
 
-            best_model_instance = random_search.best_estimator_
-            all_best_params[name] = random_search.best_params_
-            print(f"Best parameters for {name}: {random_search.best_params_}")
+        if name in parameters:
+            print(f"  > Tuning hyperparameters for {name}...")
+            random_search = RandomizedSearchCV(model, parameters[name], n_iter=15, scoring='neg_root_mean_squared_error', cv=3, verbose=0, n_jobs=-1, random_state=42)
+            random_search.fit(X_scaled_temp, y_bc_temp)
+            tuned_model = random_search.best_estimator_
+            current_best_params = random_search.best_params_
+            print(f"  > Best params: {current_best_params}")
         
-        else:
-            best_model_instance = model
-            best_model_instance.fit(X_train_scaled, y_train_boxcox)
-            all_best_params[name] = "Default parameters used"
+        # --- Manual 5-Fold Evaluation ---
+        fold_rmses = []
+        fold_r2s = []
+        fold_maes = []
         
-        trained_models[name] = best_model_instance
-        val_preds_log = best_model_instance.predict(X_val_scaled)
-        val_preds = inv_boxcox(val_preds_log, lambda_param)
+        # Array to store predictions for the whole dataset (Out-of-Fold)
+        oof_preds_full = np.zeros(len(y))
         
-        mse = mean_squared_error(y_val, val_preds)
-        rmse = np.sqrt(mse)
-        mae = mean_absolute_error(y_val, val_preds)
-        r2 = r2_score(y_val, val_preds)
-        mape = mean_absolute_percentage_error(y_val, val_preds)
+        for fold, (train_idx, val_idx) in enumerate(kf.split(X_encoded, y)):
+            # Split
+            X_tr, X_val = X_encoded.iloc[train_idx], X_encoded.iloc[val_idx]
+            y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            
+            # Scale inside the fold to prevent leakage
+            scaler = StandardScaler()
+            X_tr_sc = scaler.fit_transform(X_tr)
+            X_val_sc = scaler.transform(X_val)
+            
+            # Boxcox target inside the fold
+            y_tr_bc, lambda_param = boxcox(y_tr)
+            
+            # Train
+            fold_model = clone(tuned_model)
+            fold_model.fit(X_tr_sc, y_tr_bc)
+            
+            # Predict
+            pred_bc = fold_model.predict(X_val_sc)
+            pred_orig = inv_boxcox(pred_bc, lambda_param)
+            
+            # Store OOF
+            oof_preds_full[val_idx] = pred_orig
+            
+            # Metric
+            fold_rmses.append(np.sqrt(mean_squared_error(y_val, pred_orig)))
+            fold_maes.append(mean_absolute_error(y_val, pred_orig))
+            fold_r2s.append(r2_score(y_val, pred_orig))
+
+        avg_rmse = np.mean(fold_rmses)
+        avg_mae = np.mean(fold_maes)
+        avg_r2 = np.mean(fold_r2s)
+        
+        print(f"  > Avg RMSE: {avg_rmse:,.2f} | Avg R2: {avg_r2:.4f}")
 
         model_performance[name] = {
-            'RMSE': rmse,
-            'MAE': mae,
-            'MSE': mse,
-            'MAPE': mape,
-            'R2': r2
+            'RMSE': avg_rmse,
+            'MAE': avg_mae,
+            'R2': avg_r2,
+            'Best Parameters': str(current_best_params)
         }
-
-        print(f"{name} Validation RMSE: {rmse:.2f}")
-
-        if rmse < best_rmse:
-            best_rmse = rmse
-            best_model_name = name
-            best_model = best_model_instance
         
+        oof_predictions[name] = oof_preds_full
+
+        if avg_rmse < best_rmse:
+            best_rmse = avg_rmse
+            best_model_name = name
+            best_model_params = current_best_params
+
+    # Reporting
+    print("\n" + "="*30)
+    print("FINAL 5-FOLD CV RESULTS")
+    print("="*30)
     sorted_performance = sorted(model_performance.items(), key=lambda item: item[1]['RMSE'])
-    for model_name, performance in sorted_performance:
-        print(f"{model_name}: RMSE = {performance['RMSE']:.2f}")
-
-    print(f"\nBest model: {best_model_name} with RMSE: {best_rmse:.2f}")
-
-    final_preds_log = best_model.predict(X_submission_scaled)
-    final_preds = inv_boxcox(final_preds_log, lambda_param)
 
     report_data = []
     for model_name, metrics in sorted_performance:
-        params = all_best_params.get(model_name, "default")
+        print(f"{model_name:<20} RMSE: {metrics['RMSE']:,.2f}  R2: {metrics['R2']:.4f}")
         report_data.append({
             'Model': model_name,
             'RMSE': f"{metrics['RMSE']:.2f}",
             'MAE': f"{metrics['MAE']:.2f}",
-            'MSE': f"{metrics['MSE']:.2f}",
-            'MAPE': f"{metrics['MAPE']:.2f}",
             'R2': f"{metrics['R2']:.4f}",
-            'Best Parameters': str(params)
+            'Best Parameters': metrics['Best Parameters']
         })
+    
     report_df = pd.DataFrame(report_data)
-    report_file = 'model_report.csv'
-    report_df.to_csv(report_file, index=False)
-
-    print("Creating an ensemble of the top 3 models..." )
-    top_3_models = [model[0] for model in sorted_performance[:3]]
-    ensemble_preds = np.zeros(X_submission_scaled.shape[0])
-    val_preds_ensemble = {}
-    for model_name in top_3_models:
-        model_instance = trained_models[model_name]
-        preds = model_instance.predict(X_val_scaled)
-        val_preds_ensemble[model_name] = inv_boxcox(preds, lambda_param)
-    predictions_df = pd.DataFrame(val_preds_ensemble, index=y_val.index)
-    ensemble_preds = predictions_df.mean(axis=1)
-    ensemble_RMSE = np.sqrt(mean_squared_error(y_val, ensemble_preds.loc[y_val.index]))
-    ensemble_r2 = r2_score(y_val, ensemble_preds.loc[y_val.index])
-    print(f"Ensemble Model RMSE on Validation Set: {ensemble_RMSE:.2f}, R2: {ensemble_r2:.4f}")
-    plot_actual_predicted_best(y_val, ensemble_preds, "Ensemble Model")
-
+    report_df.to_csv('model_report_cv.csv', index=False)
+    
     rmse_plot = {name: metrics['RMSE'] for name, metrics in model_performance.items()}
     plot_results(rmse_plot)
-    top_5_models = sorted_performance[:5]
-    top_5_plot = [(name, metrics['RMSE']) for name, metrics in top_5_models]
-    plot_top_models_predictions(top_5_plot, trained_models, X_val_scaled, y_val, lambda_param)
 
-    final_val_preds_boxcox = best_model.predict(X_val_scaled)
-    final_val_preds = inv_boxcox(final_val_preds_boxcox, lambda_param)
-    plot_actual_predicted_best(y_val, final_val_preds, best_model_name)
-
-    ## combining train and validation for best model retraining
-    X_full = pd.concat([X_train, X_val], axis=0)
-    y_full = pd.concat([y_train, y_val], axis=0)
-    X_full_scaled = scaler.fit_transform(X_full)
-    X_full_scaled = pd.DataFrame(X_full_scaled, columns=X_full.columns)
-    y_full_boxcox, lambda_param_full = boxcox(y_full)
+    # Creating Ensemble using OOF predictions
+    print("\nCreating an ensemble of the top 3 models (using OOF preds)..." )
+    top_3_names = [x[0] for x in sorted_performance[:3]]
     
-    print(f"\nRetraining best model {best_model_name} on full dataset...")
-    model = clone(models[best_model_name])
-    best_params = all_best_params.get(best_model_name)
-    if best_params != "Default parameters used":
-        model.set_params(**best_params)
-    model.fit(X_full_scaled, y_full_boxcox)
-    final_test_preds_boxcox = model.predict(X_submission_scaled)
-    final_test_preds = inv_boxcox(final_test_preds_boxcox, lambda_param_full)
+    ensemble_oof_preds = np.zeros(len(y))
+    for name in top_3_names:
+        ensemble_oof_preds += oof_predictions[name]
+    ensemble_oof_preds /= 3.0
+    
+    ens_rmse = np.sqrt(mean_squared_error(y, ensemble_oof_preds))
+    ens_r2 = r2_score(y, ensemble_oof_preds)
+    print(f"Ensemble OOF RMSE: {ens_rmse:,.2f} | R2: {ens_r2:.4f}")
+    
+    plot_actual_predicted_best(y, ensemble_oof_preds, "Ensemble (5-Fold)")
+
+    # Retraining best model on full data for submission
+    print(f"\nRetraining best model {best_model_name} on full dataset for submission...")
+    
+    # Full Prep
+    scaler_full = StandardScaler()
+    X_full_sc = pd.DataFrame(scaler_full.fit_transform(X_encoded), columns=X_encoded.columns)
+    X_sub_sc = pd.DataFrame(scaler_full.transform(X_submission_encoded), columns=X_submission_encoded.columns)
+    y_full_bc, lambda_full = boxcox(y)
+    
+    # Train
+    final_model = clone(models[best_model_name])
+    if best_model_params is not None and best_model_params != "Default parameters used":
+        final_model.set_params(**best_model_params)
+    
+    final_model.fit(X_full_sc, y_full_bc)
+    
+    # Predict
+    final_preds_log = final_model.predict(X_sub_sc)
+    final_preds = inv_boxcox(final_preds_log, lambda_full)
 
     submission_df = pd.DataFrame({
         'Id': submission_ids,
-        'SalePrice': final_test_preds
+        'SalePrice': final_preds
     })
-    submission_file = 'submission(single).csv'
+    submission_file = 'submission_cv_best.csv'
     submission_df.to_csv(submission_file, index=False)
     print(f"Submission file '{submission_file}' created successfully.")
-
-    print("\nRetraining top models for an ensemble submission...")
-    final_predictions = {}
-    top_3_model_names = [model[0] for model in sorted_performance[:3]] 
-    for model_name in top_3_model_names:
-        print(f"Retraining {model_name} for the ensemble...")
-        model_instance = clone(models[model_name])
-        params = all_best_params.get(model_name)
-        if params != "Default parameters used":
-            model_instance.set_params(**params)
-        model_instance.fit(X_full_scaled, y_full_boxcox)
-        preds_transformed = model_instance.predict(X_submission_scaled)
-        final_predictions[model_name] = inv_boxcox(preds_transformed, lambda_param)
-
-    predictions_df = pd.DataFrame(final_predictions)
-    ensemble_preds = predictions_df.mean(axis=1)
-    ensemble_submission_df = pd.DataFrame({'Id': submission_ids, 'SalePrice': ensemble_preds})
-    ensemble_submission_df.to_csv('final_ensemble_submission.csv', index=False)
-    print("Final ensemble submission file created successfully!")

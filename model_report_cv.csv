@@ -1,0 +1,7 @@
+Model,RMSE,MAE,R2,Best Parameters
+CatBoost,27981.35,14767.30,0.8611,"{'learning_rate': 0.02, 'l2_leaf_reg': 1, 'iterations': 1500, 'depth': 6}"
+XGBoost,28542.41,15093.20,0.8524,"{'subsample': 0.6, 'n_estimators': 2000, 'max_depth': 3, 'learning_rate': 0.01, 'colsample_bytree': 0.4}"
+LightGBM,28679.05,16226.62,0.8603,"{'num_leaves': 15, 'n_estimators': 1000, 'learning_rate': 0.01, 'boosting_type': 'gbdt'}"
+Random Forest,31576.41,17819.44,0.8287,"{'n_estimators': 700, 'min_samples_split': 5, 'min_samples_leaf': 2, 'max_depth': None}"
+SVR,39201.86,20309.61,0.7530,"{'kernel': 'rbf', 'gamma': 'auto', 'epsilon': 0.01, 'C': 8}"
+Linear Regression,74341.47,18833.84,-1.7508,Default parameters used
